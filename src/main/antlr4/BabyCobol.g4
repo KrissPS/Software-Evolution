@@ -1,7 +1,7 @@
 grammar BabyCobol;
 
 program
-    : identification data procedure EOF
+    : identification data? procedure? EOF
     ;
 
 identification
