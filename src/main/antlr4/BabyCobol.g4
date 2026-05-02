@@ -30,9 +30,12 @@ pictureString
     ;
 
 pictureAtom
-    : PIC_CHAR
-    | INT
-    | LPAREN INT RPAREN
+    : PIC_CHAR pictureRep?
+    | INT pictureRep?
+    ;
+
+pictureRep
+    : LPAREN INT RPAREN
     ;
 
 likeClause
@@ -44,7 +47,21 @@ occursClause
     ;
 
 procedure
-    : PROCEDURE DIVISION DOT
+    : PROCEDURE DIVISION DOT statement*
+    ;
+
+statement
+    : displayStmt
+    ;
+
+displayStmt
+    : DISPLAY atomic+ (WITH NO ADVANCING)? DOT
+    ;
+
+atomic
+    : ID
+    | INT
+    | STRING
     ;
 
 // MAIN KEYWORDS
@@ -61,6 +78,12 @@ LIKE    : 'LIKE';
 OCCURS  : 'OCCURS';
 TIMES   : 'TIMES';
 
+// DISPLAY
+DISPLAY   : 'DISPLAY';
+WITH      : 'WITH';
+NO        : 'NO';
+ADVANCING : 'ADVANCING';
+
 // SYMBOLS
 DOT    : '.';
 LPAREN : '(';
@@ -70,5 +93,6 @@ RPAREN : ')';
 INT      : [0-9]+;
 PIC_CHAR : [9AXZSV];
 ID       : [A-Z][A-Z0-9-]*;
+STRING   : '"' (~["\r\n])* '"';
 
 WS : [ \t\r\n]+ -> skip;
