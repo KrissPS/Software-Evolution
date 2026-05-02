@@ -52,10 +52,24 @@ procedure
 
 statement
     : displayStmt
+    | acceptStmt
+    | addStmt
     ;
 
 displayStmt
     : DISPLAY atomic+ (WITH NO ADVANCING)? DOT
+    ;
+
+acceptStmt
+    : ACCEPT ID+ DOT
+    ;
+
+addStmt
+    : ADD atomic+ TO atomic givingClause? DOT
+    ;
+
+givingClause
+    : GIVING ID+
     ;
 
 atomic
@@ -70,6 +84,11 @@ PROGRAM_ID     : 'PROGRAM-ID';
 DATA           : 'DATA';
 PROCEDURE      : 'PROCEDURE';
 DIVISION       : 'DIVISION';
+ACCEPT         : 'ACCEPT';
+ADD            : 'ADD';
+TO             : 'TO';
+GIVING         : 'GIVING';
+
 
 // DATA DIVISION FEAT
 PICTURE : 'PICTURE';
