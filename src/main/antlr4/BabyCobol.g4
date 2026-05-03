@@ -72,6 +72,7 @@ addStmt
 
 divideStmt
     : DIVIDE atomic INTO atomic+ givingRemainderClause? DOT
+    ;
 
 mulStmt
     : MULTIPLY atomic BY atomic+ givingClause? DOT
