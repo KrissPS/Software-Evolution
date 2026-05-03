@@ -54,6 +54,7 @@ statement
     : displayStmt
     | acceptStmt
     | addStmt
+    | divideStmt
     ;
 
 displayStmt
@@ -68,9 +69,22 @@ addStmt
     : ADD atomic+ TO atomic givingClause? DOT
     ;
 
+divideStmt
+    : DIVIDE atomic INTO atomic+ givingRemainderClause? DOT
+    ;
+
 givingClause
     : GIVING ID+
     ;
+
+givingRemainderClause
+    : GIVING ID+ remainderClause?
+    ;
+
+remainderClause
+    : REMAINDER ID
+    ;
+
 
 atomic
     : ID
@@ -88,6 +102,9 @@ ACCEPT         : 'ACCEPT';
 ADD            : 'ADD';
 TO             : 'TO';
 GIVING         : 'GIVING';
+DIVIDE         : 'DIVIDE';
+INTO           : 'INTO';
+REMAINDER      : 'REMAINDER';
 
 
 // DATA DIVISION FEAT
