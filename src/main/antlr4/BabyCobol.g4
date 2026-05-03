@@ -54,6 +54,7 @@ statement
     : displayStmt
     | acceptStmt
     | addStmt
+    | mulStmt
     ;
 
 displayStmt
@@ -66,6 +67,10 @@ acceptStmt
 
 addStmt
     : ADD atomic+ TO atomic givingClause? DOT
+    ;
+
+mulStmt
+    : MULTIPLY atomic BY atomic+ givingClause? DOT
     ;
 
 givingClause
@@ -86,6 +91,8 @@ PROCEDURE      : 'PROCEDURE';
 DIVISION       : 'DIVISION';
 ACCEPT         : 'ACCEPT';
 ADD            : 'ADD';
+MULTIPLY : 'MULTIPLY';
+BY       : 'BY';
 TO             : 'TO';
 GIVING         : 'GIVING';
 
