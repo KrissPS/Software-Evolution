@@ -56,6 +56,7 @@ statement
     | addStmt
     | divideStmt
     | mulStmt
+    | evaluateStmt
     ;
 
 displayStmt
@@ -77,6 +78,44 @@ divideStmt
 mulStmt
     : MULTIPLY atomic BY atomic+ givingClause? DOT
     ;
+
+// EVALUATE statement ----
+evaluateStmt
+    : EVALUATE anyExpression alsoClause* whenClauseStatement+ END DOT
+    ;
+
+alsoClause
+    : ALSO anyExpression
+    ;
+
+whenClauseStatement
+    : whenClause statement+
+    ;
+
+whenClause
+    : WHEN whenSubject
+    | WHEN OTHER
+    ;
+
+whenSubject
+    : subWhenSubject (ALSO whenSubject)?
+    ;
+
+subWhenSubject
+    : (anyExpression (THROUGH anyExpression)? )+
+    ;
+
+anyExpression
+    : atomic
+    | anyExpression ( PLUS | MINUS | STAR | FORWARDSLASH ) anyExpression
+    | anyExpression ( EQUAL | LESSTHAN | GREATERTHAN | LTEQUALTO | GTEQUALTO ) anyExpression
+    | MINUS anyExpression
+    | LPAREN anyExpression RPAREN
+    ;
+
+
+// EVALUATE statement END ----
+
 
 givingClause
     : GIVING ID+
@@ -105,14 +144,19 @@ PROCEDURE      : 'PROCEDURE';
 DIVISION       : 'DIVISION';
 ACCEPT         : 'ACCEPT';
 ADD            : 'ADD';
-MULTIPLY : 'MULTIPLY';
-BY       : 'BY';
+MULTIPLY       : 'MULTIPLY';
+BY             : 'BY';
 TO             : 'TO';
 GIVING         : 'GIVING';
 DIVIDE         : 'DIVIDE';
 INTO           : 'INTO';
 REMAINDER      : 'REMAINDER';
-
+EVALUATE       : 'EVALUATE';
+ALSO           : 'ALSO';
+END            : 'END';
+WHEN           : 'WHEN';
+OTHER          : 'OTHER';
+THROUGH        : 'THROUGH';
 
 // DATA DIVISION FEAT
 PICTURE : 'PICTURE';
@@ -128,9 +172,19 @@ NO        : 'NO';
 ADVANCING : 'ADVANCING';
 
 // SYMBOLS
-DOT    : '.';
-LPAREN : '(';
-RPAREN : ')';
+DOT             : '.';
+LPAREN          : '(';
+RPAREN          : ')';
+PLUS            : '+';
+MINUS           : '-';
+STAR            : '*';
+FORWARDSLASH    : '/';
+EQUAL           : '=';
+LESSTHAN        : '<';
+GREATERTHAN     : '>';
+LTEQUALTO       : '<=';
+GTEQUALTO       : '>=';
+
 
 // VALUES
 INT      : [0-9]+;
