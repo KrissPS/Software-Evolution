@@ -54,6 +54,7 @@ statement
     : displayStmt
     | acceptStmt
     | addStmt
+    | divideStmt
     | mulStmt
     ;
 
@@ -69,6 +70,9 @@ addStmt
     : ADD atomic+ TO atomic givingClause? DOT
     ;
 
+divideStmt
+    : DIVIDE atomic INTO atomic+ givingRemainderClause? DOT
+
 mulStmt
     : MULTIPLY atomic BY atomic+ givingClause? DOT
     ;
@@ -76,6 +80,15 @@ mulStmt
 givingClause
     : GIVING ID+
     ;
+
+givingRemainderClause
+    : GIVING ID+ remainderClause?
+    ;
+
+remainderClause
+    : REMAINDER ID
+    ;
+
 
 atomic
     : ID
@@ -95,6 +108,9 @@ MULTIPLY : 'MULTIPLY';
 BY       : 'BY';
 TO             : 'TO';
 GIVING         : 'GIVING';
+DIVIDE         : 'DIVIDE';
+INTO           : 'INTO';
+REMAINDER      : 'REMAINDER';
 
 
 // DATA DIVISION FEAT
