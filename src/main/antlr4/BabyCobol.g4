@@ -57,6 +57,7 @@ statement
     | divideStmt
     | mulStmt
     | evaluateStmt
+    | ifStmt
     ;
 
 displayStmt
@@ -78,6 +79,20 @@ divideStmt
 mulStmt
     : MULTIPLY atomic BY atomic+ givingClause? DOT
     ;
+
+// IF statement ----
+ifStmt
+    : IF booleanExpression THEN statement+ elseStmt? END?
+    ;
+
+elseStmt
+    : ELSE statement+
+    ;
+
+
+// IF statement END ----
+
+
 
 // EVALUATE statement ----
 evaluateStmt
@@ -113,6 +128,26 @@ anyExpression
     | LPAREN anyExpression RPAREN
     ;
 
+booleanExpression
+    : relationCondition
+    | booleanExpression ( AND | OR ) booleanExpression
+    | NOT booleanExpression
+    | LPAREN booleanExpression RPAREN
+    ;
+
+relationCondition
+    : anyExpression relationalOperator anyExpression
+    ;
+
+
+relationalOperator
+    : EQUAL
+    | LESSTHAN 
+    | GREATERTHAN
+    | LTEQUALTO
+    | GTEQUALTO
+    | ANGLEDBRACKETS
+    ;
 
 // EVALUATE statement END ----
 
@@ -157,6 +192,14 @@ END            : 'END';
 WHEN           : 'WHEN';
 OTHER          : 'OTHER';
 THROUGH        : 'THROUGH';
+IF             : 'IF';
+THEN           : 'THEN';
+ELSE           : 'ELSE';
+AND            : 'AND';
+OR             : 'OR';
+NOT            : 'NOT';
+
+
 
 // DATA DIVISION FEAT
 PICTURE : 'PICTURE';
@@ -184,6 +227,7 @@ LESSTHAN        : '<';
 GREATERTHAN     : '>';
 LTEQUALTO       : '<=';
 GTEQUALTO       : '>=';
+ANGLEDBRACKETS  : '<>';
 
 
 // VALUES
