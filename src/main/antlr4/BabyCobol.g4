@@ -58,6 +58,8 @@ statement
     | mulStmt
     | evaluateStmt
     | ifStmt
+    | stopStmt
+    | subtractStmt
     ;
 
 displayStmt
@@ -151,6 +153,18 @@ relationalOperator
 
 // EVALUATE statement END ----
 
+// STOP statement ----
+
+stopStmt
+    : STOP DOT
+    ;
+
+// STOP statement END ----
+
+
+subtractStmt
+    : SUBTRACT atomic+ FROM atomic+ givingClause? DOT
+    ;
 
 givingClause
     : GIVING ID+
@@ -198,6 +212,8 @@ ELSE           : 'ELSE';
 AND            : 'AND';
 OR             : 'OR';
 NOT            : 'NOT';
+SUBTRACT       : 'SUBTRACT';
+FROM           : 'FROM';
 
 
 
