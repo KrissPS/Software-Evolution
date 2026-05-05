@@ -59,6 +59,7 @@ statement
     | evaluateStmt
     | ifStmt
     | moveStmt
+    | performStmt
     ;
 
 displayStmt
@@ -99,6 +100,20 @@ moveStmt
     ;
 // MOVE statement END ----
 
+// PERFORM statement ----
+performStmt
+    : PERFORM ID throughClause? timesClause?
+    ;
+
+throughClause
+    : THROUGH ID
+    ;
+
+timesClause
+    : atomic TIMES
+    ;
+
+// PERFORM statement END----
 
 
 // EVALUATE statement ----
@@ -144,15 +159,6 @@ booleanExpression
     ;
 
 
-relationalOperator
-    : EQUAL
-    | LESSTHAN 
-    | GREATERTHAN
-    | LTEQUALTO
-    | GTEQUALTO
-    | ANGLEDBRACKETS
-    ;
-
 // EVALUATE statement END ----
 
 
@@ -173,6 +179,15 @@ atomic
     : ID
     | INT
     | STRING
+    ;
+
+relationalOperator
+    : EQUAL
+    | LESSTHAN 
+    | GREATERTHAN
+    | LTEQUALTO
+    | GTEQUALTO
+    | ANGLEDBRACKETS
     ;
 
 // MAIN KEYWORDS
@@ -203,8 +218,9 @@ AND            : 'AND';
 OR             : 'OR';
 NOT            : 'NOT';
 MOVE           : 'MOVE';
-
-
+PERFORM        : 'PERFORM';
+THROUGH        : 'THROUGH';
+TIMES          : 'TIMES';
 
 // DATA DIVISION FEAT
 PICTURE : 'PICTURE';
