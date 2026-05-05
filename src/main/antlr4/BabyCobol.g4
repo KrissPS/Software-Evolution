@@ -58,6 +58,7 @@ statement
     | mulStmt
     | evaluateStmt
     | ifStmt
+    | moveStmt
     ;
 
 displayStmt
@@ -92,6 +93,12 @@ elseStmt
 
 // IF statement END ----
 
+// MOVE statement ----
+moveStmt
+    : MOVE atomic TO ID+
+    ;
+// MOVE statement END ----
+
 
 
 // EVALUATE statement ----
@@ -113,7 +120,7 @@ whenClause
     ;
 
 whenSubject
-    : subWhenSubject (ALSO whenSubject)?
+    : subWhenSubject (ALSO subWhenSubject)*
     ;
 
 subWhenSubject
@@ -129,14 +136,11 @@ anyExpression
     ;
 
 booleanExpression
-    : relationCondition
+    : atomic
     | booleanExpression ( AND | OR ) booleanExpression
+    | booleanExpression ( EQUAL | LESSTHAN | GREATERTHAN | LTEQUALTO | GTEQUALTO ) booleanExpression
     | NOT booleanExpression
     | LPAREN booleanExpression RPAREN
-    ;
-
-relationCondition
-    : anyExpression relationalOperator anyExpression
     ;
 
 
@@ -198,6 +202,7 @@ ELSE           : 'ELSE';
 AND            : 'AND';
 OR             : 'OR';
 NOT            : 'NOT';
+MOVE           : 'MOVE';
 
 
 
