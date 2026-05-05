@@ -58,26 +58,28 @@ statement
     | mulStmt
     | evaluateStmt
     | ifStmt
+    | moveStmt
+    | performStmt
     ;
 
 displayStmt
-    : DISPLAY atomic+ (WITH NO ADVANCING)? DOT
+    : DISPLAY atomic+ (WITH NO ADVANCING)?
     ;
 
 acceptStmt
-    : ACCEPT ID+ DOT
+    : ACCEPT ID+
     ;
 
 addStmt
-    : ADD atomic+ TO atomic givingClause? DOT
+    : ADD atomic+ TO atomic givingClause?
     ;
 
 divideStmt
-    : DIVIDE atomic INTO atomic+ givingRemainderClause? DOT
+    : DIVIDE atomic INTO atomic+ givingRemainderClause?
     ;
 
 mulStmt
-    : MULTIPLY atomic BY atomic+ givingClause? DOT
+    : MULTIPLY atomic BY atomic+ givingClause?
     ;
 
 // IF statement ----
@@ -92,11 +94,31 @@ elseStmt
 
 // IF statement END ----
 
+// MOVE statement ----
+moveStmt
+    : MOVE atomic TO ID+
+    ;
+// MOVE statement END ----
+
+// PERFORM statement ----
+performStmt
+    : PERFORM ID throughClause? timesClause?
+    ;
+
+throughClause
+    : THROUGH ID
+    ;
+
+timesClause
+    : atomic TIMES
+    ;
+
+// PERFORM statement END----
 
 
 // EVALUATE statement ----
 evaluateStmt
-    : EVALUATE anyExpression alsoClause* whenClauseStatement+ END DOT
+    : EVALUATE anyExpression alsoClause* whenClauseStatement+ END
     ;
 
 alsoClause
@@ -113,7 +135,7 @@ whenClause
     ;
 
 whenSubject
-    : subWhenSubject (ALSO whenSubject)?
+    : subWhenSubject (ALSO subWhenSubject)*
     ;
 
 subWhenSubject
@@ -129,25 +151,13 @@ anyExpression
     ;
 
 booleanExpression
-    : relationCondition
+    : atomic
     | booleanExpression ( AND | OR ) booleanExpression
+    | booleanExpression ( EQUAL | LESSTHAN | GREATERTHAN | LTEQUALTO | GTEQUALTO ) booleanExpression
     | NOT booleanExpression
     | LPAREN booleanExpression RPAREN
     ;
 
-relationCondition
-    : anyExpression relationalOperator anyExpression
-    ;
-
-
-relationalOperator
-    : EQUAL
-    | LESSTHAN 
-    | GREATERTHAN
-    | LTEQUALTO
-    | GTEQUALTO
-    | ANGLEDBRACKETS
-    ;
 
 // EVALUATE statement END ----
 
@@ -169,6 +179,15 @@ atomic
     : ID
     | INT
     | STRING
+    ;
+
+relationalOperator
+    : EQUAL
+    | LESSTHAN 
+    | GREATERTHAN
+    | LTEQUALTO
+    | GTEQUALTO
+    | ANGLEDBRACKETS
     ;
 
 // MAIN KEYWORDS
@@ -198,8 +217,10 @@ ELSE           : 'ELSE';
 AND            : 'AND';
 OR             : 'OR';
 NOT            : 'NOT';
-
-
+MOVE           : 'MOVE';
+PERFORM        : 'PERFORM';
+THROUGH        : 'THROUGH';
+TIMES          : 'TIMES';
 
 // DATA DIVISION FEAT
 PICTURE : 'PICTURE';
