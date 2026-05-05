@@ -84,13 +84,12 @@ mulStmt
 
 // IF statement ----
 ifStmt
-    : IF booleanExpression THEN statement+ elseStmt? END?
+    : IF anyExpression THEN statement+ elseStmt? END?
     ;
 
 elseStmt
     : ELSE statement+
     ;
-
 
 // IF statement END ----
 
@@ -143,19 +142,32 @@ subWhenSubject
     ;
 
 anyExpression
-    : atomic
-    | anyExpression ( PLUS | MINUS | STAR | FORWARDSLASH ) anyExpression
-    | anyExpression ( EQUAL | LESSTHAN | GREATERTHAN | LTEQUALTO | GTEQUALTO ) anyExpression
-    | MINUS anyExpression
-    | LPAREN anyExpression RPAREN
+    : logicalExpression
     ;
 
-booleanExpression
+logicalExpression
+    : relationalExpression (( AND |OR ) relationalExpression )*
+    ;
+
+relationalExpression
+    : additiveExpression (( EQUAL|LESSTHAN|GREATERTHAN|LTEQUALTO|GTEQUALTO|ANGLEDBRACKETS) additiveExpression )*
+    ;
+
+additiveExpression
+    : multiplicativeExpression (( PLUS|MINUS)multiplicativeExpression)*
+    ;
+
+multiplicativeExpression
+    : unaryExpression ((STAR |FORWARDSLASH ) unaryExpression)*
+    ;
+
+unaryExpression
+    : (PLUS| MINUS | NOT)? primaryExpression
+    ;
+
+primaryExpression
     : atomic
-    | booleanExpression ( AND | OR ) booleanExpression
-    | booleanExpression ( EQUAL | LESSTHAN | GREATERTHAN | LTEQUALTO | GTEQUALTO ) booleanExpression
-    | NOT booleanExpression
-    | LPAREN booleanExpression RPAREN
+    | LPAREN anyExpression RPAREN
     ;
 
 
@@ -219,8 +231,6 @@ OR             : 'OR';
 NOT            : 'NOT';
 MOVE           : 'MOVE';
 PERFORM        : 'PERFORM';
-THROUGH        : 'THROUGH';
-TIMES          : 'TIMES';
 
 // DATA DIVISION FEAT
 PICTURE : 'PICTURE';
