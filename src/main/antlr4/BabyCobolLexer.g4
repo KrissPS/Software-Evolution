@@ -34,7 +34,7 @@ PERFORM        : 'PERFORM';
 STOP           : 'STOP';
 
 // DATA DIVISION FEAT
-PICTURE : 'PICTURE';
+PICTURE : 'PICTURE' -> pushMode(PICTURE_MODE);
 IS      : 'IS';
 LIKE    : 'LIKE';
 OCCURS  : 'OCCURS';
@@ -63,7 +63,6 @@ ANGLEDBRACKETS  : '<>';
 
 // VALUES
 INT      : [0-9]+;
-PIC_CHAR : [9AXZSV];
 ID       : [a-zA-Z][a-zA-Z0-9-]*;
 STRING   : '"' (~["\r\n])* '"';
 
@@ -78,3 +77,10 @@ mode PROGRAM_ID_VALUE_MODE;
 
 PID_NAME      : ~[.\r\n]+;
 PID_DOT_LAST  : '.' -> popMode;
+
+mode PICTURE_MODE;
+
+PIC_WS : [ \t\r\n]+ -> skip;
+PIC_IS : 'IS' -> type(IS);
+
+PICTURE_VALUE : ~[ \t\r\n.]+ -> popMode;
