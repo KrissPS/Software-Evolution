@@ -63,7 +63,8 @@ ANGLEDBRACKETS  : '<>';
 
 // VALUES
 INT      : [0-9]+;
-ID       : [a-zA-Z][a-zA-Z0-9-]*;
+PIC_CHAR : [9AXZSV];
+ID       : '-'? [a-zA-Z][a-zA-Z0-9-]*;
 STRING   : '"' (~["\r\n])* '"';
 
 WS : [ \t\r\n]+ -> skip;
