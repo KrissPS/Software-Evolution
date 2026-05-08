@@ -26,20 +26,7 @@ dataClause
     ;
 
 pictureClause
-    : PICTURE IS pictureString
-    ;
-
-pictureString
-    : pictureAtom+
-    ;
-
-pictureAtom
-    : PIC_CHAR pictureRep?
-    | INT pictureRep?
-    ;
-
-pictureRep
-    : LPAREN INT RPAREN
+    : PICTURE IS PICTURE_VALUE
     ;
 
 likeClause

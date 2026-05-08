@@ -34,7 +34,7 @@ PERFORM        : 'PERFORM';
 STOP           : 'STOP';
 
 // DATA DIVISION FEAT
-PICTURE : 'PICTURE';
+PICTURE : 'PICTURE' -> pushMode(PICTURE_MODE);
 IS      : 'IS';
 LIKE    : 'LIKE';
 OCCURS  : 'OCCURS';
@@ -78,3 +78,10 @@ mode PROGRAM_ID_VALUE_MODE;
 
 PID_NAME      : ~[.\r\n]+;
 PID_DOT_LAST  : '.' -> popMode;
+
+mode PICTURE_MODE;
+
+PIC_WS : [ \t\r\n]+ -> skip;
+PIC_IS : 'IS' -> type(IS);
+
+PICTURE_VALUE : ~[ \t\r\n.]+ -> popMode;
