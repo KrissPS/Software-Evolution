@@ -60,6 +60,20 @@ public class BabyCobolParserUtils {
         BabyCobolLexer lexer = new BabyCobolLexer(input);
         CommonTokenStream tokens = new CommonTokenStream(lexer);
         BabyCobolParser parser = new BabyCobolParser(tokens);
+        
+        // setting error listener to fail fast if syntax errors are present
+        parser.removeErrorListeners();
+        parser.addErrorListener(new BaseErrorListener() {
+            @Override
+            public void syntaxError(
+                Recognizer<?, ?> recognizer, 
+                Object offendingSymbol, int line, 
+                int charPositionInLine, 
+                String msg, RecognitionException e) 
+            {
+                throw new RuntimeException("Syntax Error at line " + line + ":" + charPositionInLine + " - " + msg);
+            }
+        });
 
         return parser.program().toStringTree(parser);
     }
