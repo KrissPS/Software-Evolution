@@ -1,11 +1,15 @@
-grammar BabyCobol;
+parser grammar BabyCobolParser;
+
+options {
+    tokenVocab=BabyCobolLexer;
+}
 
 program
     : identification data? procedure? EOF
     ;
 
 identification
-    : IDENTIFICATION DIVISION DOT PROGRAM_ID DOT ID+ DOT
+    : IDENTIFICATION DIVISION DOT PROGRAM_ID PID_DOT_FIRST PID_NAME PID_DOT_LAST
     ;
 
 data
@@ -22,20 +26,7 @@ dataClause
     ;
 
 pictureClause
-    : PICTURE IS pictureString
-    ;
-
-pictureString
-    : pictureAtom+
-    ;
-
-pictureAtom
-    : PIC_CHAR pictureRep?
-    | INT pictureRep?
-    ;
-
-pictureRep
-    : LPAREN INT RPAREN
+    : PICTURE IS PICTURE_VALUE
     ;
 
 likeClause
@@ -215,72 +206,3 @@ relationalOperator
     | GTEQUALTO
     | ANGLEDBRACKETS
     ;
-
-// MAIN KEYWORDS
-IDENTIFICATION : 'IDENTIFICATION';
-PROGRAM_ID     : 'PROGRAM-ID';
-DATA           : 'DATA';
-PROCEDURE      : 'PROCEDURE';
-DIVISION       : 'DIVISION';
-ACCEPT         : 'ACCEPT';
-ADD            : 'ADD';
-MULTIPLY       : 'MULTIPLY';
-BY             : 'BY';
-TO             : 'TO';
-GIVING         : 'GIVING';
-DIVIDE         : 'DIVIDE';
-INTO           : 'INTO';
-REMAINDER      : 'REMAINDER';
-EVALUATE       : 'EVALUATE';
-ALSO           : 'ALSO';
-END            : 'END';
-WHEN           : 'WHEN';
-OTHER          : 'OTHER';
-THROUGH        : 'THROUGH';
-IF             : 'IF';
-THEN           : 'THEN';
-ELSE           : 'ELSE';
-AND            : 'AND';
-OR             : 'OR';
-NOT            : 'NOT';
-SUBTRACT       : 'SUBTRACT';
-FROM           : 'FROM';
-MOVE           : 'MOVE';
-PERFORM        : 'PERFORM';
-
-// DATA DIVISION FEAT
-PICTURE : 'PICTURE';
-IS      : 'IS';
-LIKE    : 'LIKE';
-OCCURS  : 'OCCURS';
-TIMES   : 'TIMES';
-
-// DISPLAY
-DISPLAY   : 'DISPLAY';
-WITH      : 'WITH';
-NO        : 'NO';
-ADVANCING : 'ADVANCING';
-
-// SYMBOLS
-DOT             : '.';
-LPAREN          : '(';
-RPAREN          : ')';
-PLUS            : '+';
-MINUS           : '-';
-STAR            : '*';
-FORWARDSLASH    : '/';
-EQUAL           : '=';
-LESSTHAN        : '<';
-GREATERTHAN     : '>';
-LTEQUALTO       : '<=';
-GTEQUALTO       : '>=';
-ANGLEDBRACKETS  : '<>';
-
-
-// VALUES
-INT      : [0-9]+;
-PIC_CHAR : [9AXZSV];
-ID       : [a-zA-Z][a-zA-Z0-9-]*;
-STRING   : '"' (~["\r\n])* '"';
-
-WS : [ \t\r\n]+ -> skip;

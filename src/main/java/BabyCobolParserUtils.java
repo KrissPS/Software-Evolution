@@ -1,0 +1,66 @@
+import org.antlr.v4.runtime.*;
+import org.antlr.v4.runtime.tree.ParseTree;
+import preprocessing.CodeCleaner;
+import preprocessing.CaseInsensitive;
+
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+
+public class BabyCobolParserUtils {
+
+    public static String readResource(String path) throws Exception {
+        InputStream is = BabyCobolParserUtils.class.getResourceAsStream(path);
+
+        if (is == null) {
+            throw new RuntimeException("File not found: " + path);
+        }
+
+        return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+    }
+
+    public static String preprocess(String source) {
+        String processed = source;
+
+        if (isFixedFormat(source)) {
+            processed = CodeCleaner.cleanCode(processed);
+        }
+
+        return CaseInsensitive.process(processed);
+    }
+
+    private static boolean isFixedFormat(String source) {
+        boolean hasFixed = false;
+        boolean hasFree = false;
+
+        for (String line : source.lines().toList()) {
+            if (line.isBlank()) {
+                continue;
+            }
+
+            if (line.matches("^\\d{6}([ *-].*)?$")) {
+                hasFixed = true;
+            } else {
+                hasFree = true;
+            }
+        }
+
+        if (hasFixed && hasFree) {
+            throw new IllegalArgumentException(
+                    "Mixed fixed-format and free-format lines are not allowed."
+            );
+        }
+
+        return hasFixed;
+    }
+
+    public static String parseTree(String source) {
+
+        CharStream input = CharStreams.fromString(source);
+
+        BabyCobolLexer lexer = new BabyCobolLexer(input);
+        CommonTokenStream tokens = new CommonTokenStream(lexer);
+        BabyCobolParser parser = new BabyCobolParser(tokens);
+
+        return parser.program().toStringTree(parser);
+    }
+}

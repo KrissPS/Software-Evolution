@@ -1,25 +1,16 @@
-import org.antlr.v4.runtime.*;
-import org.antlr.v4.runtime.tree.ParseTree;
-import java.io.InputStream;
-
 public class Main {
     public static void main(String[] args) throws Exception {
 
-        InputStream is = Main.class.getResourceAsStream("/examples/test.babycob");
+        String source = BabyCobolParserUtils.readResource("/examples/test.babycob");
 
-        if (is == null) {
-            throw new RuntimeException("File not found.");
-        }
+        String processedSource = BabyCobolParserUtils.preprocess(source);
 
-        CharStream input = CharStreams.fromStream(is);
+        String tree = BabyCobolParserUtils.parseTree(processedSource);
 
-        BabyCobolLexer lexer = new BabyCobolLexer(input);
-        CommonTokenStream tokens = new CommonTokenStream(lexer);
-        BabyCobolParser parser = new BabyCobolParser(tokens);
+        System.out.println("<== PROCESSED CODE ==>");
+        System.out.println(processedSource);
 
-        ParseTree tree = parser.program();
-
-        System.out.println("<== PARSE TREE ==>");
-        System.out.println(tree.toStringTree(parser));
+        System.out.println("\n<== PARSE TREE ==>");
+        System.out.println(tree);
     }
 }
