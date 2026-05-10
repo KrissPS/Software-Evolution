@@ -1,0 +1,13 @@
+IDENTIFICATION DIVISION.
+PROGRAM-ID. DisplayTest.
+
+DATA DIVISION.
+01 name picture is A.
+
+PROCEDURE DIVISION.
+display "HELLO WORLD"
+Display "Goede morgen"
+DISPLAY ""
+display "12345"
+DiSpLaY "NAME:" name
+display "Enter value:" with no advancing
