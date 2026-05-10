@@ -1,0 +1,20 @@
+IDENTIFICATION DIVISION.
+PROGRAM-ID. EvaluateTest.
+
+DATA DIVISION.
+01 age picture is 99.
+
+PROCEDURE DIVISION.
+EVALUATE age
+    WHEN 18
+        DISPLAY "Adult"
+    WHEN 13 THROUGH 17
+        DISPLAY "Teen"
+    WHEN OTHER
+        DISPLAY "Child"
+END
+
+EVALUATE 1 + 2 * 3
+    WHEN < 10 AND > 5 OR = 7
+        DISPLAY "True"
+END

@@ -23,4 +23,32 @@ public class StatementParsingTest {
         String tree = BabyCobolParserUtils.parseTree(BabyCobolParserUtils.preprocess(code));
         assertNotNull(tree);
     }
+
+    @Test
+    void testSubtractStatements() throws Exception {
+        String code = BabyCobolParserUtils.readResource("/examples/parser_subtract_stmt.babycob");
+        String tree = BabyCobolParserUtils.parseTree(BabyCobolParserUtils.preprocess(code));
+        assertNotNull(tree);
+    }
+
+    @Test
+    void testEvaluateStatements() throws Exception {
+        String code = BabyCobolParserUtils.readResource("/examples/parser_evaluate_stmt.babycob");
+        String tree = BabyCobolParserUtils.parseTree(BabyCobolParserUtils.preprocess(code));
+        assertNotNull(tree);
+    }
+
+    @Test
+    void testPerformStatements() throws Exception {
+        String code = BabyCobolParserUtils.readResource("/examples/parser_perform_stmt.babycob");
+        String tree = BabyCobolParserUtils.parseTree(BabyCobolParserUtils.preprocess(code));
+        assertNotNull(tree);
+    }
+
+    @Test
+    void testDataDivisionClauses() throws Exception {
+        String code = BabyCobolParserUtils.readResource("/examples/parser_data_division.babycob");
+        String tree = BabyCobolParserUtils.parseTree(BabyCobolParserUtils.preprocess(code));
+        assertNotNull(tree);
+    }
 }
