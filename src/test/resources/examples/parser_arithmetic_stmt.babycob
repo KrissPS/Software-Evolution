@@ -1,0 +1,13 @@
+IDENTIFICATION DIVISION.
+PROGRAM-ID. ArithmeticTest.
+
+DATA DIVISION.
+01 summation picture is 9.
+01 result picture is 9.
+
+PROCEDURE DIVISION.
+add 1 2 to summation
+divide 1 into 2 giving result
+multiply 2 by summation
+MULTIPLY 3 BY summation giving result
+Multiply 2 By summation result
