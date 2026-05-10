@@ -1,0 +1,44 @@
+identification division.
+program-id. Test.
+
+data division.
+01 name picture is A(10).
+01 summation picture is 9.
+01 result picture is 9.
+
+procedure division.
+display "HELLO WORLD"
+Display "Goedemorgen"
+DISPLAY ""
+display "12345"
+DiSpLaY "NAME:" name
+display "Enter value: " with no advancing
+
+accept name
+
+add 1 2 to summation
+
+divide 1 into 2 giving result
+
+multiply 2 by summation
+multiply 3 by summation giving result
+multiply 2 by summation result
+
+move 5 to summation
+
+evaluate 5
+    when 1
+        display "ONE"
+    when other
+        display "OTHER"
+end
+
+evaluate summation also result
+    when 1 also 2
+        display "BOTH MATCH"
+end
+
+perform task1
+perform task1 through task2
+perform task1 3 times
+perform task1 through task2 5 times
