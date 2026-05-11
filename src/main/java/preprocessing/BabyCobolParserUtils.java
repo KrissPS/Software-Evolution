@@ -1,10 +1,13 @@
+package preprocessing;
 import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.tree.ParseTree;
-import preprocessing.CodeCleaner;
-import preprocessing.CaseInsensitive;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.stream.Collectors;
+
+import parser.BabyCobolLexer;
+import parser.BabyCobolParser;
 
 public class BabyCobolParserUtils {
 
@@ -32,7 +35,7 @@ public class BabyCobolParserUtils {
         boolean hasFixed = false;
         boolean hasFree = false;
 
-        for (String line : source.lines().toList()) {
+        for (String line : source.lines().collect(Collectors.toList())) {
             if (line.isBlank()) {
                 continue;
             }

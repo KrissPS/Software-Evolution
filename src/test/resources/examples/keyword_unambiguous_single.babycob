@@ -1,0 +1,9 @@
+IDENTIFICATION DIVISION.
+PROGRAM-ID. TestKeyword.
+
+DATA DIVISION.
+01 amount picture is 9.
+01 result picture is 9.
+
+PROCEDURE DIVISION.
+add amount to result
