@@ -1,0 +1,12 @@
+IDENTIFICATION DIVISION.
+PROGRAM-ID. TestMultiple.
+
+DATA DIVISION.
+01 amount picture is 9.
+01 result picture is 9.
+01 count picture is 9.
+01 total picture is 9.
+
+PROCEDURE DIVISION.
+add amount to result
+add count to total
