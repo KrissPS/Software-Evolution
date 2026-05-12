@@ -42,7 +42,7 @@
         </executions>
         <configuration>
           <visitor>true</visitor>
-          <outputDirectory>${project.build.directory}/generated-sources/antlr4</outputDirectory>
+          <outputDirectory>${project.build.directory}/generated-sources/antlr4/parser</outputDirectory>
           <arguments>
             <argument>-package</argument>
             <argument>parser</argument>

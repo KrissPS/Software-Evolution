@@ -9,7 +9,7 @@ program
     ;
 
 identification
-    : IDENTIFICATION DIVISION DOT PROGRAM_ID PID_DOT_FIRST PID_NAME PID_DOT_LAST
+    : IDENTIFICATION DIVISION DOT PROGRAM_ID DOT ID DOT
     ;
 
 data
@@ -26,7 +26,9 @@ dataClause
     ;
 
 pictureClause
-    : PICTURE IS PICTURE_VALUE
+    : PICTURE IS INT
+    | PICTURE IS ID
+    | PICTURE IS PIC_CHAR+
     ;
 
 likeClause
