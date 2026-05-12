@@ -1,0 +1,11 @@
+IDENTIFICATION DIVISION.
+PROGRAM-ID. TestAmbiguous.
+
+DATA DIVISION.
+01 amount picture is 9.
+01 result picture is 9.
+01 total picture is 9.
+
+PROCEDURE DIVISION.
+add amount to result
+add total to result

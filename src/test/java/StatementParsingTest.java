@@ -1,4 +1,7 @@
 import org.junit.jupiter.api.Test;
+
+import preprocessing.BabyCobolParserUtils;
+
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 public class StatementParsingTest {
