@@ -3,7 +3,7 @@ import preprocessing.BabyCobolParserUtils;
 public class Main {
     public static void main(String[] args) throws Exception {
 
-        String source = BabyCobolParserUtils.readResource("/examples/test.babycob");
+        String source = BabyCobolParserUtils.readResource("/examples/test_loop.babycob");
 
         String processedSource = BabyCobolParserUtils.preprocess(source);
 

@@ -9,7 +9,7 @@ program
     ;
 
 identification
-    : IDENTIFICATION DIVISION DOT PROGRAM_ID DOT ID DOT
+    : IDENTIFICATION DIVISION DOT PROGRAM_ID DOT ID+ DOT
     ;
 
 data
@@ -55,6 +55,7 @@ statement
     | subtractStmt
     | moveStmt
     | performStmt
+    | loopStmt
     ;
 
 displayStmt
@@ -141,7 +142,13 @@ anyExpression
     ;
 
 logicalExpression
-    : relationalExpression (( AND |OR ) relationalExpression )*
+    : relationalExpression ((AND | OR) contractedRelationalExpression)*
+    ;
+
+contractedRelationalExpression
+    : relationalExpression
+    | relationalOperator additiveExpression
+    | additiveExpression
     ;
 
 relationalExpression
@@ -193,6 +200,28 @@ remainderClause
     : REMAINDER ID
     ;
 
+loopStmt
+    : LOOP loopElement* END
+    ;
+
+loopElement
+    : varyingClause
+    | whileClause
+    | untilClause
+    | statement
+    ;
+
+varyingClause
+    : VARYING ID (FROM atomic)? (TO atomic)? (BY atomic)?
+    ;
+
+whileClause
+    : WHILE anyExpression
+    ;
+
+untilClause
+    : UNTIL anyExpression
+    ;
 
 atomic
     : ID
@@ -202,7 +231,7 @@ atomic
 
 relationalOperator
     : EQUAL
-    | LESSTHAN 
+    | LESSTHAN
     | GREATERTHAN
     | LTEQUALTO
     | GTEQUALTO
