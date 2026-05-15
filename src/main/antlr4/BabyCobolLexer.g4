@@ -32,6 +32,10 @@ FROM           : 'FROM';
 MOVE           : 'MOVE';
 PERFORM        : 'PERFORM';
 STOP           : 'STOP';
+LOOP    : 'LOOP';
+VARYING : 'VARYING';
+WHILE   : 'WHILE';
+UNTIL   : 'UNTIL';
 
 // DATA DIVISION FEAT
 PICTURE : 'PICTURE';
@@ -63,8 +67,8 @@ ANGLEDBRACKETS  : '<>';
 
 // VALUES
 INT      : [0-9]+;
-PIC_CHAR : [9AXZSV];
 ID       : '-'? [a-zA-Z][a-zA-Z0-9-]*;
+PIC_CHAR : [9AXZSV];
 STRING   : '"' (~["\r\n])* '"';
 
 WS : [ \t\r\n]+ -> skip;
