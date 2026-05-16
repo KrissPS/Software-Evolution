@@ -26,9 +26,9 @@ dataClause
     ;
 
 pictureClause
-    : PICTURE IS INT
-    | PICTURE IS ID
-    | PICTURE IS PIC_CHAR+
+    : PICTURE IS INT (LPAREN INT RPAREN)?
+    | PICTURE IS ID (LPAREN INT RPAREN)?
+    | PICTURE IS PIC_CHAR+ (LPAREN INT RPAREN)?
     ;
 
 likeClause
