@@ -13,7 +13,7 @@ public class Main {
         String tree = BabyCobolParserUtils.parseTree(processedSource);
         
         // building the AST using the visitor
-        ASTNode astRoot = ASTUtils.buildAST(processedSource);
+        ASTUtils.ASTResult astResult = ASTUtils.buildASTAndSymbolTable(processedSource);
 
         System.out.println("<== PROCESSED CODE ==>");
         System.out.println(processedSource);
@@ -22,6 +22,9 @@ public class Main {
         System.out.println(tree);
         
         System.out.println("\n<== ABSTRACT SYNTAX TREE ==>");
-        System.out.println(astRoot.printTree());
+        System.out.println(astResult.root.printTree());
+        
+        System.out.println("\n<== SYMBOL TABLE ==>");
+        System.out.println(astResult.symbolTable);
     }
 }

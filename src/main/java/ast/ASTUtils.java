@@ -6,29 +6,31 @@ import parser.BabyCobolParser;
 
 public class ASTUtils {
 
-    public static ASTNode buildAST(String source) {
+    public static class ASTResult {
+        public final ASTNode root;
+        public final SymbolTable symbolTable;
+        
+        public ASTResult(ASTNode root, SymbolTable symbolTable) {
+            this.root = root;
+            this.symbolTable = symbolTable;
+        }
+    }
+
+    public static ASTResult buildASTAndSymbolTable(String source) {
         CharStream charStream = CharStreams.fromString(source);
         BabyCobolLexer lexer = new BabyCobolLexer(charStream);
         CommonTokenStream tokens = new CommonTokenStream(lexer);
         BabyCobolParser parser = new BabyCobolParser(tokens);
         
-        // setting error listener to fail fast if syntax errors are present
         parser.removeErrorListeners();
-        parser.addErrorListener(new BaseErrorListener() {
-            @Override
-            public void syntaxError(
-                Recognizer<?, ?> recognizer, 
-                Object offendingSymbol, int line, 
-                int charPositionInLine, 
-                String msg, RecognitionException e) 
-            {
-                throw new RuntimeException("Syntax Error at line " + line + ":" + charPositionInLine + " - " + msg);
-            }
-        });
-
         BabyCobolParser.ProgramContext programCtx = parser.program();
         
         BuildASTVisitor visitor = new BuildASTVisitor();
-        return visitor.visit(programCtx);
+        ASTNode root = visitor.visit(programCtx);
+        return new ASTResult(root, visitor.getSymbolTable());
+    }
+
+    public static ASTNode buildAST(String source) {
+        return buildASTAndSymbolTable(source).root;
     }
 }
