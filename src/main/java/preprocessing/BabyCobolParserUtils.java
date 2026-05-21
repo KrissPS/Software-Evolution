@@ -4,6 +4,7 @@ import org.antlr.v4.runtime.tree.ParseTree;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.stream.Collectors;
 
 import parser.BabyCobolLexer;
@@ -21,14 +22,19 @@ public class BabyCobolParserUtils {
         return new String(is.readAllBytes(), StandardCharsets.UTF_8);
     }
 
-    public static String preprocess(String source) {
+    public static String preprocess(String source) throws Exception {
         String processed = source;
 
         if (isFixedFormat(source)) {
             processed = CodeCleaner.cleanCode(processed);
         }
 
-        return CaseInsensitive.process(processed);
+        processed = new CopyExpander(Path.of("src/main/resources/copybooks"))
+                .expand(processed);
+
+        processed = CaseInsensitive.process(processed);
+
+        return processed;
     }
 
     private static boolean isFixedFormat(String source) {

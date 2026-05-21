@@ -6,7 +6,7 @@ import ast.ASTUtils;
 public class Main {
     public static void main(String[] args) throws Exception {
 
-        String source = BabyCobolParserUtils.readResource("/examples/test_insensitive.babycob");
+        String source = BabyCobolParserUtils.readResource("/examples/test_copy.babycob");
 
         String processedSource = BabyCobolParserUtils.preprocess(source);
 
