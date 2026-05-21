@@ -40,7 +40,11 @@ occursClause
     ;
 
 procedure
-    : PROCEDURE DIVISION DOT statement*
+    : PROCEDURE DIVISION DOT sentence*
+    ;
+
+sentence
+    : statement+ DOT
     ;
 
 statement
@@ -56,6 +60,7 @@ statement
     | moveStmt
     | performStmt
     | loopStmt
+    | nextSentenceStmt
     ;
 
 displayStmt
@@ -178,14 +183,14 @@ primaryExpression
 // STOP statement ----
 
 stopStmt
-    : STOP DOT
+    : STOP
     ;
 
 // STOP statement END ----
 
 
 subtractStmt
-    : SUBTRACT atomic+ FROM atomic+ givingClause? DOT
+    : SUBTRACT atomic+ FROM atomic+ givingClause?
     ;
 
 givingClause
@@ -236,4 +241,8 @@ relationalOperator
     | LTEQUALTO
     | GTEQUALTO
     | ANGLEDBRACKETS
+    ;
+
+nextSentenceStmt
+    : NEXT SENTENCE
     ;
