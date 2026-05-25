@@ -181,6 +181,12 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
         for (BabyCobolParser.AtomicContext atomic : ctx.atomic()) {
             node.addChild(visit(atomic));
         }
+        
+        BabyCobolParser.AtomicContext toAtomic = ctx.atomic(ctx.atomic().size() - 1);
+        if ((toAtomic.INT() != null || toAtomic.STRING() != null) && ctx.givingClause() == null) {
+            throw new IllegalArgumentException("If the second argument of ADD is a literal, the GIVING clause is mandatory.");
+        }
+        
         if (ctx.givingClause() != null) {
             node.addChild(visit(ctx.givingClause()));
         }

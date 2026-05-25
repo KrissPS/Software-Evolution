@@ -12,6 +12,25 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class SemanticAnalyzerTest {
 
+    @Test
+    void testAddWithLiteralTargetAndGivingClause() {
+        String code = "IDENTIFICATION DIVISION. PROGRAM-ID. TEST. PROCEDURE DIVISION. ADD 1 TO 2 GIVING A.";
+        assertDoesNotThrow(() -> ast.ASTUtils.buildAST(code));
+    }
+
+    @Test
+    void testAddWithLiteralTargetMissingGivingClause() {
+        String code = "IDENTIFICATION DIVISION. PROGRAM-ID. TEST. PROCEDURE DIVISION. ADD 1 TO 2.";
+        Exception exception = assertThrows(IllegalArgumentException.class, () -> ast.ASTUtils.buildAST(code));
+        assertEquals("If the second argument of ADD is a literal the GIVING clause is mandatory.", exception.getMessage());
+    }
+
+    @Test
+    void testAddWithIdentifierTargetMissingGivingClause() {
+        String code = "IDENTIFICATION DIVISION. PROGRAM-ID. TEST. PROCEDURE DIVISION. ADD 1 TO A.";
+        assertDoesNotThrow(() -> ast.ASTUtils.buildAST(code));
+    }
+
     // @Test
     // void testSemanticValidTypes() {
     //     // TODO: add test 
