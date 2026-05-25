@@ -205,6 +205,14 @@ remainderClause
     : REMAINDER ID
     ;
 
+copyStmt
+    : COPY ID replacingClause?
+    ;
+
+replacingClause
+    : REPLACING COPY_LITERAL BY COPY_LITERAL
+    ;
+
 loopStmt
     : LOOP loopElement* END
     ;
