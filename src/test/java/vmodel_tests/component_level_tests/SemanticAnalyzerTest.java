@@ -70,4 +70,39 @@ public class SemanticAnalyzerTest {
     }
 
 
+    /**
+     * MULTIPLY statement tests ----------
+     * if the second argument is a literal, the third argument is mandatory
+     */
+    @Test
+    void testMultiplyWithLiteralTargetMissingGivingClause() {
+        String code = "IDENTIFICATION DIVISION. PROGRAM-ID. TEST. PROCEDURE DIVISION. MULTIPLY 1 BY 2.";
+        Exception exception = assertThrows(IllegalArgumentException.class, () -> ast.ASTUtils.buildAST(code));
+        assertEquals("If the second argument of MULTIPLY is a literal, the GIVING clause is mandatory.", exception.getMessage());
+    }
+
+    @Test
+    void testMultiplyWithLiteralTargetAndGivingClause() {
+        String code = "IDENTIFICATION DIVISION. PROGRAM-ID. TEST. PROCEDURE DIVISION. MULTIPLY 1 BY 2 GIVING A.";
+        assertDoesNotThrow(() -> ast.ASTUtils.buildAST(code));
+    }
+
+
+    /**
+     * SUBTRACT statement tests ----------
+     * if the second argument is a literal, the third argument is mandatory
+     */
+    @Test
+    void testSubtractWithLiteralTargetMissingGivingClause() {
+        String code = "IDENTIFICATION DIVISION. PROGRAM-ID. TEST. PROCEDURE DIVISION. SUBTRACT 1 FROM 2.";
+        Exception exception = assertThrows(IllegalArgumentException.class, () -> ast.ASTUtils.buildAST(code));
+        assertEquals("If the second argument of SUBTRACT is a literal, the GIVING clause is mandatory.", exception.getMessage());
+    }
+
+    @Test
+    void testSubtractWithLiteralTargetAndGivingClause() {
+        String code = "IDENTIFICATION DIVISION. PROGRAM-ID. TEST. PROCEDURE DIVISION. SUBTRACT 1 FROM 2 GIVING A.";
+        assertDoesNotThrow(() -> ast.ASTUtils.buildAST(code));
+    }
+
 }
