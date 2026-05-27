@@ -7,5 +7,5 @@ IF 1 = 1 THEN
     DISPLAY "In IF"
     NEXT SENTENCE
     DISPLAY "Should not print"
-END
-DISPLAY "After IF"
+END.
+DISPLAY "After IF".

@@ -10,4 +10,4 @@ Display "Goede morgen"
 DISPLAY ""
 display "12345"
 DiSpLaY "NAME:" name
-display "Enter value:" with no advancing
+display "Enter value:" with no advancing.

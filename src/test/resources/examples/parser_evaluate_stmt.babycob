@@ -17,4 +17,4 @@ END
 EVALUATE 1 + 2 * 3
     WHEN age < 18 AND age > 12
         DISPLAY "True"
-END
+END.
