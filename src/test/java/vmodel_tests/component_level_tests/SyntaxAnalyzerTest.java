@@ -20,8 +20,8 @@ public class SyntaxAnalyzerTest {
 
     @Test
     void testSyntaxErrorThrownOnInvalidCode() {
-        // adding DOT after DISPLAY statement
-        String code = "IDENTIFICATION DIVISION. PROGRAM-ID. HELLO. PROCEDURE DIVISION. DISPLAY \"Hello\".";
+        // Missing the sentence ending DOT after DISPLAY statement
+        String code = "IDENTIFICATION DIVISION. PROGRAM-ID. HELLO. PROCEDURE DIVISION. DISPLAY \"Hello\"";
         
         RuntimeException exception = assertThrows(RuntimeException.class, () -> {
             BabyCobolParserUtils.parseTree(code);

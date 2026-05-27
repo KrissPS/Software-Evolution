@@ -140,6 +140,15 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
     @Override
     public ASTNode visitProcedure(BabyCobolParser.ProcedureContext ctx) {
         ASTNode node = new ASTNode("Procedure");
+        for (BabyCobolParser.SentenceContext sentence : ctx.sentence()) {
+            node.addChild(visit(sentence));
+        }
+        return node;
+    }
+
+    @Override
+    public ASTNode visitSentence(BabyCobolParser.SentenceContext ctx) {
+        ASTNode node = new ASTNode("Sentence");
         for (BabyCobolParser.StatementContext stmt : ctx.statement()) {
             node.addChild(visit(stmt));
         }
