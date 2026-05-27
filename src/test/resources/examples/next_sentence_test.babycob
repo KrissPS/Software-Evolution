@@ -8,4 +8,4 @@ IF 1 = 1 THEN
     NEXT SENTENCE
     DISPLAY "Should not print"
 END
-DISPLAY "After IF"
+DISPLAY "After IF".

@@ -8,4 +8,4 @@ DATA DIVISION.
 
 PROCEDURE DIVISION.
 add amount to result
-add total to result
+add total to result.
