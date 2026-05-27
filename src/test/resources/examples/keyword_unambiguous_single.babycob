@@ -6,4 +6,4 @@ DATA DIVISION.
 01 result picture is 9.
 
 PROCEDURE DIVISION.
-add amount to result
+add amount to result.

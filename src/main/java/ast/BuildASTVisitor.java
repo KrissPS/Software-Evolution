@@ -140,6 +140,15 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
     @Override
     public ASTNode visitProcedure(BabyCobolParser.ProcedureContext ctx) {
         ASTNode node = new ASTNode("Procedure");
+        for (BabyCobolParser.SentenceContext sentence : ctx.sentence()) {
+            node.addChild(visit(sentence));
+        }
+        return node;
+    }
+
+    @Override
+    public ASTNode visitSentence(BabyCobolParser.SentenceContext ctx) {
+        ASTNode node = new ASTNode("Sentence");
         for (BabyCobolParser.StatementContext stmt : ctx.statement()) {
             node.addChild(visit(stmt));
         }
@@ -181,6 +190,12 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
         for (BabyCobolParser.AtomicContext atomic : ctx.atomic()) {
             node.addChild(visit(atomic));
         }
+        
+        BabyCobolParser.AtomicContext toAtomic = ctx.atomic(ctx.atomic().size() - 1);
+        if ((toAtomic.INT() != null || toAtomic.STRING() != null) && ctx.givingClause() == null) {
+            throw new IllegalArgumentException("If the second argument of ADD is a literal, the GIVING clause is mandatory.");
+        }
+        
         if (ctx.givingClause() != null) {
             node.addChild(visit(ctx.givingClause()));
         }
@@ -193,7 +208,21 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
         for (BabyCobolParser.AtomicContext atomic : ctx.atomic()) {
             node.addChild(visit(atomic));
         }
+        
+        for (int i = 1; i < ctx.atomic().size(); i++) {
+            BabyCobolParser.AtomicContext secondArg = ctx.atomic(i);
+            if ((secondArg.INT() != null || secondArg.STRING() != null) && ctx.givingRemainderClause() == null) {
+                throw new IllegalArgumentException("If the second argument is a literal, the third argument is mandatory.");
+            }
+        }
+
         if (ctx.givingRemainderClause() != null) {
+            if (ctx.atomic().size() > 2) {
+                throw new IllegalArgumentException("If the third argument is present, there can be only one second argument.");
+            }
+            if (ctx.givingRemainderClause().remainderClause() != null && ctx.givingRemainderClause().ID().size() > 1) {
+                throw new IllegalArgumentException("If the fourth argument is present, there can be only one third argument.");
+            }
             node.addChild(visit(ctx.givingRemainderClause()));
         }
         return node;
@@ -205,6 +234,12 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
         for (BabyCobolParser.AtomicContext atomic : ctx.atomic()) {
             node.addChild(visit(atomic));
         }
+
+        BabyCobolParser.AtomicContext toAtomic = ctx.atomic(ctx.atomic().size() - 1);
+        if ((toAtomic.INT() != null || toAtomic.STRING() != null) && ctx.givingClause() == null) {
+            throw new IllegalArgumentException("If the second argument of MULTIPLY is a literal, the GIVING clause is mandatory.");
+        }
+
         if (ctx.givingClause() != null) {
             node.addChild(visit(ctx.givingClause()));
         }
@@ -434,6 +469,12 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
         for (BabyCobolParser.AtomicContext atomic : ctx.atomic()) {
             node.addChild(visit(atomic)); // this collects both FROM and terms.
         }
+
+        BabyCobolParser.AtomicContext toAtomic = ctx.atomic(ctx.atomic().size() - 1);
+        if ((toAtomic.INT() != null || toAtomic.STRING() != null) && ctx.givingClause() == null) {
+            throw new IllegalArgumentException("If the second argument of SUBTRACT is a literal, the GIVING clause is mandatory.");
+        }
+
         if (ctx.givingClause() != null) {
             node.addChild(visit(ctx.givingClause()));
         }
