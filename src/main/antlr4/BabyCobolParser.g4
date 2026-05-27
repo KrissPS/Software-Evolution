@@ -44,7 +44,7 @@ procedure
     ;
 
 sentence
-    : statement+ DOT
+    : statement+
     ;
 
 statement

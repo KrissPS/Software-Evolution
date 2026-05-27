@@ -2,4 +2,4 @@ identification division.
 program-id. Test.
 
 procedure division.
-display "HELLO".
+display "HELLO"

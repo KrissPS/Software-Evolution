@@ -8,5 +8,5 @@ DATA DIVISION.
 01 total picture is 9.
 
 PROCEDURE DIVISION.
-add amount to result.
-add count to total.
+add amount to result
+add count to total
