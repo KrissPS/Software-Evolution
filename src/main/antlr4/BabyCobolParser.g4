@@ -26,9 +26,11 @@ dataClause
     ;
 
 pictureClause
-    : PICTURE IS INT (LPAREN INT RPAREN)?
-    | PICTURE IS ID (LPAREN INT RPAREN)?
-    | PICTURE IS PIC_CHAR+ (LPAREN INT RPAREN)?
+    : PICTURE IS pictureValue
+    ;
+
+pictureValue
+    : (ID | INT | PIC_CHAR | LPAREN | RPAREN)+
     ;
 
 likeClause
@@ -239,6 +241,7 @@ untilClause
 atomic
     : ID
     | INT
+    | DECIMAL
     | STRING
     ;
 

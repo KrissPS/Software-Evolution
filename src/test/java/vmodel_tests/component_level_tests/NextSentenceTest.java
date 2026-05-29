@@ -1,7 +1,9 @@
+package vmodel_tests.component_level_tests;
+
 import org.junit.jupiter.api.Test;
 
 import preprocessing.BabyCobolParserUtils;
-import preprocessing.BabyCobolInterpreter;
+import runtime.BabyCobolInterpreter;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
