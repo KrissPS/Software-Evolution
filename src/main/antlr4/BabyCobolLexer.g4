@@ -70,6 +70,7 @@ GTEQUALTO       : '>=';
 ANGLEDBRACKETS  : '<>';
 
 // VALUES
+DECIMAL   : [0-9]+ '.' [0-9]+;
 INT      : [0-9]+;
 ID       : '-'? [a-zA-Z][a-zA-Z0-9-]*;
 PIC_CHAR : [9AXZSV];

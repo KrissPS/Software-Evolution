@@ -49,42 +49,31 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
     @Override
     public ASTNode visitDataEntry(BabyCobolParser.DataEntryContext ctx) {
         ASTNode node = new ASTNode("DataEntry");
+
         int level = Integer.parseInt(ctx.INT().getText());
         String id = ctx.ID().getText();
+
         node.addChild(new ASTNode("Level", String.valueOf(level)));
         node.addChild(new ASTNode("ID", id));
-        
+
         String picture = "";
         String like = "";
         int occurs = 0;
 
         for (BabyCobolParser.DataClauseContext clause : ctx.dataClause()) {
             if (clause.pictureClause() != null) {
-                StringBuilder picBuilder = new StringBuilder();
-                if (clause.pictureClause().INT() != null && !clause.pictureClause().INT().isEmpty()) {
-                    for (TerminalNode t : clause.pictureClause().INT()) {
-                        picBuilder.append(t.getText());
-                    }
-                }
-                if (clause.pictureClause().ID() != null) {
-                    picBuilder.append(clause.pictureClause().ID().getText());
-                }
-                if (clause.pictureClause().PIC_CHAR() != null && !clause.pictureClause().PIC_CHAR().isEmpty()) {
-                    for (TerminalNode c : clause.pictureClause().PIC_CHAR()) {
-                        picBuilder.append(c.getText());
-                    }
-                }
-                picture = picBuilder.toString();
+                picture = clause.pictureClause().pictureValue().getText();
             } else if (clause.likeClause() != null) {
                 like = clause.likeClause().ID().getText();
             } else if (clause.occursClause() != null) {
                 occurs = Integer.parseInt(clause.occursClause().INT().getText());
             }
+
             node.addChild(visit(clause));
         }
-        
+
         symbolTable.addSymbol(new Symbol(id, level, picture, like, occurs));
-        
+
         return node;
     }
 
@@ -105,22 +94,12 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
 
     @Override
     public ASTNode visitPictureClause(BabyCobolParser.PictureClauseContext ctx) {
-        ASTNode node = new ASTNode("PictureClause");
-        if (ctx.INT() != null && !ctx.INT().isEmpty()) {
-            for (TerminalNode t : ctx.INT()) {
-                node.addChild(new ASTNode("INT", t.getText()));
-            }
-        }
-        if (ctx.ID() != null) {
-            node.addChild(new ASTNode("ID", ctx.ID().getText()));
-        }
-        if (ctx.PIC_CHAR() != null && !ctx.PIC_CHAR().isEmpty()) {
-            StringBuilder chars = new StringBuilder();
-            for (TerminalNode c : ctx.PIC_CHAR()) {
-                chars.append(c.getText());
-            }
-            node.addChild(new ASTNode("PIC_CHAR", chars.toString()));
-        }
+        ASTNode node = new ASTNode("PICTURE_CLAUSE");
+
+        String pictureValue = ctx.pictureValue().getText();
+
+        node.addChild(new ASTNode("PICTURE_VALUE", pictureValue));
+
         return node;
     }
 
