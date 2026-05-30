@@ -3,12 +3,15 @@ package runtime;
 import parser.BabyCobolParser;
 import preprocessing.NextSentenceException;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Scanner;
 
 public class BabyCobolInterpreter {
 
     private final Memory memory = new Memory();
     private final Scanner scanner = new Scanner(System.in);
+    private final Map<String, BabyCobolParser.ParagraphContext> paragraphs = new HashMap<>();
 
     public void execute(BabyCobolParser.ProgramContext program) {
         if (program == null) return;
@@ -20,9 +23,45 @@ public class BabyCobolInterpreter {
         BabyCobolParser.ProcedureContext procedure = program.procedure();
         if (procedure == null) return;
 
-        for (BabyCobolParser.SentenceContext sentence : procedure.sentence()) {
+        loadParagraphs(procedure);
+
+        try {
+            for (BabyCobolParser.SentenceContext sentence : procedure.sentence()) {
+                executeSentence(sentence);
+            }
+
+            for (BabyCobolParser.ParagraphContext paragraph : procedure.paragraph()) {
+                executeParagraph(paragraph);
+            }
+
+        } catch (GoToException e) {
+            executeParagraphByName(e.target());
+        }
+    }
+
+    private void loadParagraphs(BabyCobolParser.ProcedureContext procedure) {
+        paragraphs.clear();
+
+        for (BabyCobolParser.ParagraphContext paragraph : procedure.paragraph()) {
+            String name = paragraph.ID().getText().toUpperCase();
+            paragraphs.put(name, paragraph);
+        }
+    }
+
+    private void executeParagraph(BabyCobolParser.ParagraphContext paragraph) {
+        for (BabyCobolParser.SentenceContext sentence : paragraph.sentence()) {
             executeSentence(sentence);
         }
+    }
+
+    private void executeParagraphByName(String name) {
+        BabyCobolParser.ParagraphContext paragraph = paragraphs.get(name.toUpperCase());
+
+        if (paragraph == null) {
+            throw new RuntimeException("Unknown paragraph: " + name);
+        }
+
+        executeParagraph(paragraph);
     }
 
     private void loadDataDivision(BabyCobolParser.DataContext data) {
@@ -60,9 +99,35 @@ public class BabyCobolInterpreter {
             handleMove(stmt.moveStmt());
         } else if (stmt.ifStmt() != null) {
             handleIf(stmt.ifStmt());
+        } else if (stmt.goToStmt() != null) {
+            handleGoTo(stmt.goToStmt());
         } else if (stmt.nextSentenceStmt() != null) {
             throw new NextSentenceException();
         }
+    }
+
+    private void handleGoTo(BabyCobolParser.GoToStmtContext ctx) {
+        String target = ctx.ID().getText().toUpperCase();
+
+        // Normal GO TO: GO TO PARAGRAPH-NAME
+        if (paragraphs.containsKey(target)) {
+            throw new GoToException(target);
+        }
+
+        // Computable GO TO: GO TO FIELD-NAME
+        if (memory.exists(target)) {
+            String runtimeTarget = memory.getValue(target).toUpperCase();
+
+            if (!paragraphs.containsKey(runtimeTarget)) {
+                throw new RuntimeException(
+                        "GO TO runtime target does not exist: " + runtimeTarget
+                );
+            }
+
+            throw new GoToException(runtimeTarget);
+        }
+
+        throw new RuntimeException("Unknown GO TO target or field: " + target);
     }
 
     private void handleDisplay(BabyCobolParser.DisplayStmtContext ctx) {

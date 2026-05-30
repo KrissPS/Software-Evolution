@@ -42,7 +42,11 @@ occursClause
     ;
 
 procedure
-    : PROCEDURE DIVISION DOT sentence*
+    : PROCEDURE DIVISION DOT sentence* paragraph*
+    ;
+
+paragraph
+    : ID DOT sentence*
     ;
 
 sentence
@@ -63,6 +67,7 @@ statement
     | performStmt
     | loopStmt
     | nextSentenceStmt
+    | goToStmt
     ;
 
 displayStmt
@@ -256,4 +261,8 @@ relationalOperator
 
 nextSentenceStmt
     : NEXT SENTENCE
+    ;
+
+goToStmt
+    : GO TO ID
     ;
