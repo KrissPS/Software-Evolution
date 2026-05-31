@@ -1,5 +1,6 @@
 import preprocessing.BabyCobolParserUtils;
 import runtime.BabyCobolInterpreter;
+// import interpreter.BabyCobolInterpreter;
 import parser.BabyCobolParser;
 
 import ast.ASTUtils;
@@ -32,7 +33,10 @@ public class Main {
         System.out.println(astResult.symbolTable);
 
         System.out.println("\n<== PROGRAM OUTPUT ==>");
+        // BabyCobolInterpreter interpreter = new BabyCobolInterpreter(astResult.symbolTable);
+        // interpreter.execute(astResult.root);
         BabyCobolInterpreter interpreter = new BabyCobolInterpreter();
         interpreter.execute(program);
+
     }
 }
