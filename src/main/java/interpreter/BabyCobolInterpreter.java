@@ -229,18 +229,50 @@ public class BabyCobolInterpreter {
         ASTNode untilCondition = null;
         java.util.List<ASTNode> statements = new java.util.ArrayList<>();
 
+        // vars holding VARYING config
+        String varyingVar = null;
+        Double toValue = null;
+        Double byValue = 1.0; // default step is 1 if BY is omitted
+        boolean isVarying = false;
+
         for (ASTNode child : node.getChildren()) {
             if (child.getType().equals("WhileClause")) {
                 whileCondition = child.getChildren().get(0); 
             } else if (child.getType().equals("UntilClause")) {
                 untilCondition = child.getChildren().get(0); 
-            } else if (!child.getType().equals("VaryingClause")) {
+            } else if (child.getType().equals("VaryingClause")) {
+                isVarying = true;
+                varyingVar = child.getChildren().get(0).getText().toLowerCase();
+                
+                // parse FROM, TO, BY
+                for (int i = 1; i < child.getChildren().size(); i++) {
+                    ASTNode varyingPart = child.getChildren().get(i);
+                    double val = Double.parseDouble(evaluateAtomic(varyingPart.getChildren().get(0)).toString());
+                    
+                    if (varyingPart.getType().equals("From")) {
+                        memory.put(varyingVar, val); // init loop variable
+                    } else if (varyingPart.getType().equals("To")) {
+                        toValue = val;
+                    } else if (varyingPart.getType().equals("By")) {
+                        byValue = val;
+                    }
+                }
+            } else {
                 statements.add(child);
             }
-            // Note(TODO): VaryingClause is skipped in the implementation FOR NOW
         }
 
         while (true) {
+            // 1) check VARYING 'TO' boundary condition before execution
+            if (isVarying && toValue != null) {
+                double currentVal = (Double) memory.get(varyingVar);
+                // breaks if we exceed the limit (handles both positive and negative steps)
+                if ((byValue > 0 && currentVal > toValue) || (byValue < 0 && currentVal < toValue)) {
+                    break;
+                }
+            }
+
+            // 2) check WHILE and UNTIL conds
             if (whileCondition != null && !evaluateCondition(whileCondition)) {
                 break;
             }
@@ -248,12 +280,19 @@ public class BabyCobolInterpreter {
                 break;
             }
 
+            // 3) execute loop stmts
             for (ASTNode stmt : statements) {
                 executeStatement(stmt);
             }
 
-            // break automatically if no condition is there to prevent infinite loops
-            if (whileCondition == null && untilCondition == null) {
+            // 4) increment the VARYING var
+            if (isVarying) {
+                double currentVal = (Double) memory.get(varyingVar);
+                memory.put(varyingVar, currentVal + byValue);
+            }
+
+            // 5) prevent infinite loops if no conditions are defined
+            if (whileCondition == null && untilCondition == null && !isVarying) {
                 break;
             }
         }
