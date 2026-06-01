@@ -85,7 +85,7 @@ public class BabyCobolInterpreter {
                 executeMath(statement, "/");
                 break;
             case "LoopStmt":
-                executeLoop(statement); // not complete
+                executeLoop(statement);
                 break;
             case "EvaluateStmt":
                 executeEvaluate(statement); // not complete
@@ -299,55 +299,94 @@ public class BabyCobolInterpreter {
     }
 
     private void executeEvaluate(ASTNode node) {
-        // TODO: complete the logic here
-        // node.getChildren().get(0) is the Evaluate subject (AnyExpression). 
-        // In a full implementation, you evaluate the subject and compare it 
-        // to the When subjects. Here, we resolve conditions directly.
         /*
-        so basically right now it evaluates this
-        EVALUATE TRUE
-            WHEN age = 18
-                DISPLAY "You are an adult".
-        
-        and not yet:
-        EVALUATE age
-            WHEN 18 
-                DISPLAY "You are an adult".
-            WHEN 21 THROUGH 65
-                DISPLAY "You are working age".
-
-        and:
-        EVALUATE age ALSO income
-            WHEN 18 ALSO 0
-                DISPLAY "Broke student".
+        TODO:
+        Statements of with shortened form like so still cant run
+        EVALUATE X
+            WHEN 10 OR 20
+                DISPLAY "EVALUATE CONTRACTED VALUES"
 
         */
         
+        java.util.List<Object> evaluateSubjects = new java.util.ArrayList<>();
+        
+        // 1) gather the main EVALUATE subject
+        evaluateSubjects.add(evaluateGenericExpression(node.getChildren().get(0)));
+        
+        // 2) gather any ALSO subjects
+        for (int i = 1; i < node.getChildren().size(); i++) {
+            ASTNode child = node.getChildren().get(i);
+            if (child.getType().equals("AlsoClause")) {
+                evaluateSubjects.add(evaluateGenericExpression(child.getChildren().get(0)));
+            }
+        }
+        
+        // 3) iterate through WHEN clauses
         for (int i = 1; i < node.getChildren().size(); i++) {
             ASTNode child = node.getChildren().get(i);
             
             if (child.getType().equals("WhenClauseStatement")) {
                 ASTNode whenClause = child.getChildren().get(0);
-                ASTNode whenSubject = whenClause.getChildren().get(0);
+                ASTNode whenSubjectNode = whenClause.getChildren().get(0); // either 'OTHER' or 'WhenSubject'
                 
-                boolean match = false;
-                if (whenSubject.getType().equals("OTHER")) {
-                    match = true;
+                boolean isMatch = false;
+                
+                if (whenSubjectNode.getType().equals("OTHER")) {
+                    isMatch = true;
                 } else {
-                    // fallback to basic condition evaluation for the when block
-                    match = evaluateCondition(whenSubject);
+                    // it is a WhenSubject that has SubWhenSubject nodes
+                    isMatch = true; 
+                    java.util.List<ASTNode> subSubjects = whenSubjectNode.getChildren();
+                    
+                    if (subSubjects.size() != evaluateSubjects.size()) {
+                        throw new RuntimeException("EVALUATE subjects count does not match WHEN subjects count");
+                    }
+                    
+                    // 4) compare each evaluate subject to its corresponding SubWhenSubject (ALSO matching)
+                    for (int k = 0; k < evaluateSubjects.size(); k++) {
+                        Object subjectValue = evaluateSubjects.get(k);
+                        ASTNode subWhenNode = subSubjects.get(k);
+                        
+                        boolean subMatch = false;
+                        
+                        // special handling if the subject is "TRUE" (Condition mode)
+                        if (subjectValue instanceof Boolean && (Boolean) subjectValue) {
+                            subMatch = evaluateCondition(subWhenNode);
+                        } else {
+                            // value comparison (exact match or THROUGH range)
+                            if (subWhenNode.getChildren().size() == 1) {
+                                Object whenVal = evaluateGenericExpression(subWhenNode.getChildren().get(0));
+                                if (compareValues(subjectValue, whenVal) == 0) {
+                                    subMatch = true;
+                                }
+                            } else if (subWhenNode.getChildren().size() == 2) { // THROUGH range
+                                Object rangeStart = evaluateGenericExpression(subWhenNode.getChildren().get(0));
+                                Object rangeEnd = evaluateGenericExpression(subWhenNode.getChildren().get(1));
+                                
+                                if (compareValues(subjectValue, rangeStart) >= 0 && compareValues(subjectValue, rangeEnd) <= 0) {
+                                    subMatch = true;
+                                }
+                            }
+                        }
+                        
+                        // ALSO clauses act as an AND. if one fails then the whole WHEN clause fails
+                        if (!subMatch) {
+                            isMatch = false;
+                            break; 
+                        }
+                    }
                 }
 
-                if (match) {
+                // 5) execute matching statements and break (first match wins)
+                if (isMatch) {
                     for (int j = 1; j < child.getChildren().size(); j++) {
                         executeStatement(child.getChildren().get(j));
                     }
-                    break; // EVALUATE exits after the first true WHEN
+                    break; 
                 }
             }
         }
     }
-
 
     private void executePerform(ASTNode node) {
         // TODO: Perform statement isnt implemented fully in the AST (see comments in for loop below)
@@ -369,6 +408,50 @@ public class BabyCobolInterpreter {
             System.err.println("[Interpreter Warning] PERFORM requested for paragraph: " 
                 + targetId + " (Requires Paragraph traversal in BuildASTVisitor)");
         }
+    }
+
+    // --- Helper methods for Evaluate ---
+
+    private Object evaluateGenericExpression(ASTNode exprNode) {
+        // if the expression has relational operators evaluate it as a boolean condition
+        if (hasRelationalNode(exprNode)) {
+            return evaluateCondition(exprNode);
+        }
+        // otherwise go downwards and find atomic value
+        return resolveAtomicValue(exprNode);
+    }
+
+    private boolean hasRelationalNode(ASTNode node) {
+        if (node.getType().equals("RelationalOp") || node.getType().equals("LogicalOp")) {
+            return true;
+        }
+        for (ASTNode child : node.getChildren()) {
+            if (hasRelationalNode(child)) return true;
+        }
+        return false;
+    }
+
+    private Object resolveAtomicValue(ASTNode node) {
+        // manually intercepting 'TRUE' so evaluateAtomic does not throw Variable not initialized error
+        if (node.getType().equals("AtomicID") && node.getText().equalsIgnoreCase("true")) {
+            return true;
+        }
+        if (node.getType().startsWith("Atomic")) {
+            return evaluateAtomic(node);
+        }
+        if (!node.getChildren().isEmpty()) {
+            return resolveAtomicValue(node.getChildren().get(0));
+        }
+        return null;
+    }
+
+    private int compareValues(Object a, Object b) {
+        // if both are numbers compare mathematically
+        if (a instanceof Double && b instanceof Double) {
+            return Double.compare((Double) a, (Double) b);
+        }
+        // otherwise fallback is string comparison
+        return String.valueOf(a).compareTo(String.valueOf(b));
     }
 
     // --- Expression and Value Evaluation ---
