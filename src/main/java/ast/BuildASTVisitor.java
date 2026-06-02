@@ -122,6 +122,21 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
         for (BabyCobolParser.SentenceContext sentence : ctx.sentence()) {
             node.addChild(visit(sentence));
         }
+        // traverse and add paragraphs to the AST
+        for (BabyCobolParser.ParagraphContext paragraph : ctx.paragraph()) {
+            node.addChild(visit(paragraph));
+        }
+
+        return node;
+    }
+
+    @Override
+    public ASTNode visitParagraph(BabyCobolParser.ParagraphContext ctx) {
+        // store the paragraph name as node's text
+        ASTNode node = new ASTNode("Paragraph", ctx.ID().getText());
+        for (BabyCobolParser.SentenceContext sentence : ctx.sentence()) {
+            node.addChild(visit(sentence));
+        }
         return node;
     }
 
@@ -507,9 +522,28 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
     public ASTNode visitVaryingClause(BabyCobolParser.VaryingClauseContext ctx) {
         ASTNode node = new ASTNode("VaryingClause");
         node.addChild(new ASTNode("ID", ctx.ID().getText()));
-        for (BabyCobolParser.AtomicContext atomic : ctx.atomic()) {
-            node.addChild(visit(atomic));
+        
+        // track position in atomic() since some clauses can be omitted
+        int atomicIndex = 0;
+        
+        if (ctx.FROM() != null) {
+            ASTNode fromNode = new ASTNode("From");
+            fromNode.addChild(visit(ctx.atomic(atomicIndex++)));
+            node.addChild(fromNode);
         }
+        
+        if (ctx.TO() != null) {
+            ASTNode toNode = new ASTNode("To");
+            toNode.addChild(visit(ctx.atomic(atomicIndex++)));
+            node.addChild(toNode);
+        }
+        
+        if (ctx.BY() != null) {
+            ASTNode byNode = new ASTNode("By");
+            byNode.addChild(visit(ctx.atomic(atomicIndex++)));
+            node.addChild(byNode);
+        }
+        
         return node;
     }
 
