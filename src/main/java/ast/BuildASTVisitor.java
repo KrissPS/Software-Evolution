@@ -122,6 +122,21 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
         for (BabyCobolParser.SentenceContext sentence : ctx.sentence()) {
             node.addChild(visit(sentence));
         }
+        // traverse and add paragraphs to the AST
+        for (BabyCobolParser.ParagraphContext paragraph : ctx.paragraph()) {
+            node.addChild(visit(paragraph));
+        }
+
+        return node;
+    }
+
+    @Override
+    public ASTNode visitParagraph(BabyCobolParser.ParagraphContext ctx) {
+        // store the paragraph name as node's text
+        ASTNode node = new ASTNode("Paragraph", ctx.ID().getText());
+        for (BabyCobolParser.SentenceContext sentence : ctx.sentence()) {
+            node.addChild(visit(sentence));
+        }
         return node;
     }
 

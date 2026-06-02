@@ -12,9 +12,17 @@ public class BabyCobolInterpreter {
     private SymbolTable symbolTable;
     private Map<String, Object> memory;
 
+    // to store and order paragraphs for PERFORM/THROUGH
+    private Map<String, ASTNode> paragraphs;
+    private java.util.List<String> paragraphNames;
+
     public BabyCobolInterpreter(SymbolTable symbolTable) {
         this.symbolTable = symbolTable;
         this.memory = new HashMap<>();
+
+        this.paragraphs = new java.util.LinkedHashMap<>(); // maintains insertion order
+        this.paragraphNames = new java.util.ArrayList<>();
+
         initializeMemory();
     }
 
@@ -49,7 +57,31 @@ public class BabyCobolInterpreter {
     }
 
     private void executeProcedure(ASTNode procedureNode) {
-        for (ASTNode sentence : procedureNode.getChildren()) {
+        // 1) pre-pass: indexing all paragraphs so they can be found by PERFORM
+        for (ASTNode child : procedureNode.getChildren()) {
+            if (child.getType().equals("Paragraph")) {
+                String paraName = child.getText().toLowerCase();
+                paragraphs.put(paraName, child);
+                paragraphNames.add(paraName);
+            }
+        }
+
+        // 2) execution: running top level sentences and fall through paragraphs
+        for (ASTNode child : procedureNode.getChildren()) {
+            if (child.getType().equals("Sentence")) {
+                for (ASTNode statement : child.getChildren()) {
+                    executeStatement(statement);
+                }
+            } else if (child.getType().equals("Paragraph")) {
+                // apparently in COBOL execution falls through into paragraphs 
+                // unless stopped by a GO TO or STOP RUN
+                executeParagraph(child);
+            }
+        }
+    }
+
+    private void executeParagraph(ASTNode paragraphNode) {
+        for (ASTNode sentence : paragraphNode.getChildren()) {
             if (sentence.getType().equals("Sentence")) {
                 for (ASTNode statement : sentence.getChildren()) {
                     executeStatement(statement);
@@ -91,7 +123,7 @@ public class BabyCobolInterpreter {
                 executeEvaluate(statement); // not complete
                 break;
             case "PerformStmt":
-                executePerform(statement); // not complete
+                executePerform(statement); // maybe complete?
                 break;
             case "StopStmt":
                 System.exit(0);
@@ -389,24 +421,42 @@ public class BabyCobolInterpreter {
     }
 
     private void executePerform(ASTNode node) {
-        // TODO: Perform statement isnt implemented fully in the AST (see comments in for loop below)
-        // TODO: First check if the paragraph being called in the perform even exists
         String targetId = node.getChildren().get(0).getText().toLowerCase();
+        String throughId = null;
         int times = 1;
 
+        // parse THROUGH and TIMES clauses
         for (ASTNode child : node.getChildren()) {
             if (child.getType().equals("TimesClause")) {
                 ASTNode atomicNode = child.getChildren().get(0);
                 times = (int) Double.parseDouble(evaluateAtomic(atomicNode).toString());
+            } else if (child.getType().equals("ThroughClause")) {
+                throughId = child.getText().toLowerCase();
             }
         }
 
+        // verify the target paragraph exists
+        if (!paragraphs.containsKey(targetId)) {
+            throw new RuntimeException("PERFORM error: Paragraph '" + targetId + "' does not exist.");
+        }
+        if (throughId != null && !paragraphs.containsKey(throughId)) {
+            throw new RuntimeException("PERFORM error: THROUGH paragraph '" + throughId + "' does not exist.");
+        }
+
+        // determine the execution range
+        int startIndex = paragraphNames.indexOf(targetId);
+        int endIndex = throughId != null ? paragraphNames.indexOf(throughId) : startIndex;
+
+        if (startIndex > endIndex) {
+            throw new RuntimeException("PERFORM error: THROUGH paragraph '" + throughId + "' is defined before '" + targetId + "'.");
+        }
+
+        // execute the paragraphs the requested number of times
         for (int i = 0; i < times; i++) {
-            // Note: The BuildASTVisitor does not visit Paragraphs inside 
-            // ProcedureContext (ie visitProcedure does not have any logic for paragraph from syntax)
-            // so this is a placeholder print until Paragraph ast nodes are added to the ast.
-            System.err.println("[Interpreter Warning] PERFORM requested for paragraph: " 
-                + targetId + " (Requires Paragraph traversal in BuildASTVisitor)");
+            for (int p = startIndex; p <= endIndex; p++) {
+                String paraToExecute = paragraphNames.get(p);
+                executeParagraph(paragraphs.get(paraToExecute));
+            }
         }
     }
 
