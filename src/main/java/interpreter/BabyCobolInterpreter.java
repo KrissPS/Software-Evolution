@@ -16,6 +16,10 @@ public class BabyCobolInterpreter {
     private Map<String, ASTNode> paragraphs;
     private java.util.List<String> paragraphNames;
 
+    public Map<String, Object> getMemory() {
+        return memory;
+    }
+
     public BabyCobolInterpreter(SymbolTable symbolTable) {
         this.symbolTable = symbolTable;
         this.memory = new HashMap<>();
