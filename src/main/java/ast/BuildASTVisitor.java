@@ -40,7 +40,18 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
     @Override
     public ASTNode visitData(BabyCobolParser.DataContext ctx) {
         ASTNode node = new ASTNode("Data");
+
+        Integer firstLevel = null;
+
         for (BabyCobolParser.DataEntryContext entry : ctx.dataEntry()) {
+            int level = Integer.parseInt(entry.INT().getText());
+            if (firstLevel == null) {
+                firstLevel = level;
+            } else if (level < firstLevel) {
+                throw new IllegalArgumentException(
+                    "Level number " + String.format("%02d", level) +
+                    " cannot be below the first entry's level " + String.format("%02d", firstLevel));
+            }
             node.addChild(visit(entry));
         }
         return node;
@@ -50,7 +61,13 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
     public ASTNode visitDataEntry(BabyCobolParser.DataEntryContext ctx) {
         ASTNode node = new ASTNode("DataEntry");
 
-        int level = Integer.parseInt(ctx.INT().getText());
+        String levelText = ctx.INT().getText();
+        if (levelText.length() != 2) {
+            throw new IllegalArgumentException(
+                "Level number '" + levelText + "' must be exactly two digits (e.g., 01, 05, 10)");
+        }
+
+        int level = Integer.parseInt(levelText);
         String id = ctx.ID().getText();
 
         node.addChild(new ASTNode("Level", String.valueOf(level)));

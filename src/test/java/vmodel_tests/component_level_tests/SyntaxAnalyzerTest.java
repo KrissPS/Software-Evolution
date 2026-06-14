@@ -1,6 +1,7 @@
 package vmodel_tests.component_level_tests;
 
 import org.junit.jupiter.api.Test;
+import ast.BuildASTVisitor;
 import preprocessing.BabyCobolParserUtils;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -77,5 +78,121 @@ public class SyntaxAnalyzerTest {
         String code = BabyCobolParserUtils.readResource("/examples/parser_data_division.babycob");
         String tree = BabyCobolParserUtils.parseTree(BabyCobolParserUtils.preprocess(code));
         assertNotNull(tree);
+    }
+
+    @Test
+    void testTwoDigitLevelNumbersValid() {
+        String code = """
+                IDENTIFICATION DIVISION.
+                PROGRAM-ID. TEST.
+
+                DATA DIVISION.
+                01 FIELD-A PICTURE IS 9.
+                05 FIELD-B PICTURE IS X(10).
+                10 FIELD-C PICTURE IS A(5).
+                99 FIELD-D PICTURE IS 99.
+
+                PROCEDURE DIVISION.
+                DISPLAY FIELD-A.
+                """;
+
+        assertDoesNotThrow(() -> {
+            var program = BabyCobolParserUtils.parseProgram(BabyCobolParserUtils.preprocess(code));
+            BuildASTVisitor visitor = new BuildASTVisitor();
+            visitor.visit(program);
+        });
+    }
+
+    @Test
+    void testSingleDigitLevelNumberRejected() {
+        String code = """
+                IDENTIFICATION DIVISION.
+                PROGRAM-ID. TEST.
+
+                DATA DIVISION.
+                1 FIELD-A PICTURE IS 9.
+
+                PROCEDURE DIVISION.
+                DISPLAY FIELD-A.
+                """;
+
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            var program = BabyCobolParserUtils.parseProgram(BabyCobolParserUtils.preprocess(code));
+            BuildASTVisitor visitor = new BuildASTVisitor();
+            visitor.visit(program);
+        });
+
+        assertTrue(exception.getMessage().contains("must be exactly two digits"),
+                "Expected message about two-digit level numbers, got: " + exception.getMessage());
+    }
+
+    @Test
+    void testThreeDigitLevelNumberRejected() {
+        String code = """
+                IDENTIFICATION DIVISION.
+                PROGRAM-ID. TEST.
+
+                DATA DIVISION.
+                001 FIELD-A PICTURE IS 9.
+
+                PROCEDURE DIVISION.
+                DISPLAY FIELD-A.
+                """;
+
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            var program = BabyCobolParserUtils.parseProgram(BabyCobolParserUtils.preprocess(code));
+            BuildASTVisitor visitor = new BuildASTVisitor();
+            visitor.visit(program);
+        });
+
+        assertTrue(exception.getMessage().contains("must be exactly two digits"),
+                "Expected message about two-digit level numbers, got: " + exception.getMessage());
+    }
+
+    @Test
+    void testLevelNeverBelowFirstLevelValid() {
+        String code = """
+                IDENTIFICATION DIVISION.
+                PROGRAM-ID. TEST.
+
+                DATA DIVISION.
+                05 GROUP-A.
+                10 FIELD-B PICTURE IS 9.
+                05 FIELD-C PICTURE IS X(5).
+                10 FIELD-D PICTURE IS A(3).
+
+                PROCEDURE DIVISION.
+                DISPLAY FIELD-C.
+                """;
+
+        assertDoesNotThrow(() -> {
+            var program = BabyCobolParserUtils.parseProgram(BabyCobolParserUtils.preprocess(code));
+            BuildASTVisitor visitor = new BuildASTVisitor();
+            visitor.visit(program);
+        });
+    }
+
+    @Test
+    void testLevelBelowFirstLevelRejected() {
+        String code = """
+                IDENTIFICATION DIVISION.
+                PROGRAM-ID. TEST.
+
+                DATA DIVISION.
+                05 FIELD-A PICTURE IS 9.
+                03 FIELD-B PICTURE IS X(5).
+
+                PROCEDURE DIVISION.
+                DISPLAY FIELD-A.
+                """;
+
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+            var program = BabyCobolParserUtils.parseProgram(BabyCobolParserUtils.preprocess(code));
+            BuildASTVisitor visitor = new BuildASTVisitor();
+            visitor.visit(program);
+        });
+
+        assertTrue(exception.getMessage().contains("cannot be below the first entry"),
+                "Expected message about level below first entry, got: " + exception.getMessage());
     }
 }
