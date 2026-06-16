@@ -40,7 +40,11 @@ pictureValue
     ;
 
 likeClause
-    : LIKE ID
+    : LIKE qualifiedName
+    ;
+
+qualifiedName
+    : ID (OF ID)*
     ;
 
 occursClause
@@ -81,7 +85,7 @@ displayStmt
     ;
 
 acceptStmt
-    : ACCEPT ID+
+    : ACCEPT qualifiedName+
     ;
 
 addStmt
@@ -109,7 +113,7 @@ elseStmt
 
 // MOVE statement ----
 moveStmt
-    : MOVE atomic TO ID+
+    : MOVE atomic TO qualifiedName+
     ;
 // MOVE statement END ----
 
@@ -207,15 +211,15 @@ subtractStmt
     ;
 
 givingClause
-    : GIVING ID+
+    : GIVING qualifiedName+
     ;
 
 givingRemainderClause
-    : GIVING ID+ remainderClause?
+    : GIVING qualifiedName+ remainderClause?
     ;
 
 remainderClause
-    : REMAINDER ID
+    : REMAINDER qualifiedName
     ;
 
 copyStmt
@@ -238,7 +242,7 @@ loopElement
     ;
 
 varyingClause
-    : VARYING ID (FROM atomic)? (TO atomic)? (BY atomic)?
+    : VARYING qualifiedName (FROM atomic)? (TO atomic)? (BY atomic)?
     ;
 
 whileClause
@@ -250,7 +254,7 @@ untilClause
     ;
 
 atomic
-    : ID
+    : qualifiedName
     | INT
     | DECIMAL
     | STRING

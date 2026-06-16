@@ -39,7 +39,7 @@ public class BabyCobolInterpreter {
      * OCCURS arrays are initialized as Object[] of the appropriate size
      */
     private void initializeMemory() {
-        for (Symbol symbol : symbolTable.getSymbols().values()) {
+        for (Symbol symbol : symbolTable.getAllSymbols()) {
             String pic = symbol.getPicture();
 
             if (pic != null && !pic.isEmpty()) {

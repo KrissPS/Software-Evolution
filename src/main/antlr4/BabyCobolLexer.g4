@@ -46,6 +46,7 @@ GO : 'GO';
 PICTURE : 'PICTURE';
 IS      : 'IS';
 LIKE    : 'LIKE';
+OF      : 'OF';
 OCCURS  : 'OCCURS';
 TIMES   : 'TIMES';
 
