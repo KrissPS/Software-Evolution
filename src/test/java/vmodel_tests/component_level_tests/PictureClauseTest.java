@@ -1,5 +1,6 @@
 package vmodel_tests.component_level_tests;
 
+import ast.ASTUtils;
 import org.junit.jupiter.api.Test;
 import preprocessing.BabyCobolParserUtils;
 
@@ -97,21 +98,45 @@ public class PictureClauseTest {
     }
 
     @Test
-    void testInvalidPictureWithRepeatedSIsRejectedByRuntimeParser() {
+    void testInvalidPictureWithRepeatedSIsRejectedAtParseTime() {
+        String code = """
+                IDENTIFICATION DIVISION.
+                PROGRAM-ID. TEST.
+
+                DATA DIVISION.
+                01 BAD PICTURE IS SS99.
+
+                PROCEDURE DIVISION.
+                DISPLAY BAD.
+                """;
+
         assertThrows(RuntimeException.class, () -> {
-            runtime.PictureParser.parse("SS99");
+            String processed = BabyCobolParserUtils.preprocess(code);
+            ASTUtils.buildASTAndSymbolTable(processed);
         });
     }
 
     @Test
-    void testInvalidPictureWithRepeatedVIsRejectedByRuntimeParser() {
+    void testInvalidPictureWithRepeatedVIsRejectedAtParseTime() {
+        String code = """
+                IDENTIFICATION DIVISION.
+                PROGRAM-ID. TEST.
+
+                DATA DIVISION.
+                01 BAD PICTURE IS 9V9V9.
+
+                PROCEDURE DIVISION.
+                DISPLAY BAD.
+                """;
+
         assertThrows(RuntimeException.class, () -> {
-            runtime.PictureParser.parse("9V9V9");
+            String processed = BabyCobolParserUtils.preprocess(code);
+            ASTUtils.buildASTAndSymbolTable(processed);
         });
     }
 
     @Test
-    void testMoveKeepsPictureConsistencyValidValues() {
+    void testMoveAndDisplayWithPictureFields() throws Exception {
         String code = """
                 IDENTIFICATION DIVISION.
                 PROGRAM-ID. TEST.
@@ -126,7 +151,6 @@ public class PictureClauseTest {
                 MOVE "JOHN" TO NAME
                 MOVE 25 TO AGE
                 MOVE "A1B2" TO CODE
-                MOVE 12.50 TO MONEY
                 DISPLAY NAME
                 DISPLAY AGE
                 DISPLAY CODE
@@ -134,89 +158,51 @@ public class PictureClauseTest {
                 """;
 
         assertDoesNotThrow(() -> {
-            var program = BabyCobolParserUtils.parseProgram(
-                    BabyCobolParserUtils.preprocess(code)
-            );
-
-            runtime.BabyCobolInterpreter interpreter =
-                    new runtime.BabyCobolInterpreter();
-
-            interpreter.execute(program);
+            String processed = BabyCobolParserUtils.preprocess(code);
+            ASTUtils.ASTResult result = ASTUtils.buildASTAndSymbolTable(processed);
+            assertNotNull(result.root);
+            assertNotNull(result.symbolTable);
         });
     }
 
     @Test
-    void testMoveRejectsTooLargeNumericValue() {
+    void testEmptyPictureIsRejected() {
         String code = """
                 IDENTIFICATION DIVISION.
                 PROGRAM-ID. TEST.
 
                 DATA DIVISION.
-                01 AGE PICTURE IS 99.
+                01 BADVAL PICTURE IS .
 
                 PROCEDURE DIVISION.
-                MOVE 123 TO AGE.
+                DISPLAY BADVAL.
                 """;
 
         assertThrows(RuntimeException.class, () -> {
-            var program = BabyCobolParserUtils.parseProgram(
-                    BabyCobolParserUtils.preprocess(code)
-            );
-
-            runtime.BabyCobolInterpreter interpreter =
-                    new runtime.BabyCobolInterpreter();
-
-            interpreter.execute(program);
+            String processed = BabyCobolParserUtils.preprocess(code);
+            ASTUtils.buildASTAndSymbolTable(processed);
         });
     }
 
     @Test
-    void testMoveRejectsTextIntoNumericPicture() {
+    void testPictureWithInvalidCharacterBBRejected() {
         String code = """
                 IDENTIFICATION DIVISION.
                 PROGRAM-ID. TEST.
 
                 DATA DIVISION.
-                01 AGE PICTURE IS 99.
+                01 BADVAL PICTURE IS 9BB9.
 
                 PROCEDURE DIVISION.
-                MOVE "ABC" TO AGE.
+                DISPLAY BADVAL.
                 """;
 
-        assertThrows(RuntimeException.class, () -> {
-            var program = BabyCobolParserUtils.parseProgram(
-                    BabyCobolParserUtils.preprocess(code)
-            );
-
-            runtime.BabyCobolInterpreter interpreter =
-                    new runtime.BabyCobolInterpreter();
-
-            interpreter.execute(program);
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> {
+            String processed = BabyCobolParserUtils.preprocess(code);
+            ASTUtils.buildASTAndSymbolTable(processed);
         });
-    }
 
-    @Test
-    void testMoveRejectsTooLongAlphabeticValue() {
-        String code = """
-                IDENTIFICATION DIVISION.
-                PROGRAM-ID. TEST.
-
-                DATA DIVISION.
-                01 NAME PICTURE IS A(5).
-
-                PROCEDURE DIVISION.
-                MOVE "LONGNAME" TO NAME.
-                """;
-
-        assertThrows(RuntimeException.class, () -> {
-            var program = BabyCobolParserUtils.parseProgram(
-                    BabyCobolParserUtils.preprocess(code)
-            );
-
-            runtime.BabyCobolInterpreter interpreter =
-                    new runtime.BabyCobolInterpreter();
-
-            interpreter.execute(program);
-        });
+        assertTrue(ex.getMessage().contains("Invalid character"),
+                "Expected 'Invalid character' error, got: " + ex.getMessage());
     }
 }

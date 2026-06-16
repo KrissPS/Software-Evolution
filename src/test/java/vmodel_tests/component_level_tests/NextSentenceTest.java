@@ -2,8 +2,9 @@ package vmodel_tests.component_level_tests;
 
 import org.junit.jupiter.api.Test;
 
+import ast.ASTUtils;
 import preprocessing.BabyCobolParserUtils;
-import runtime.BabyCobolInterpreter;
+import interpreter.BabyCobolInterpreter;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -16,46 +17,45 @@ public class NextSentenceTest {
 
     @Test
     void testNextSentenceParsingAndExecution() throws Exception {
-        // Read and preprocess the test file
+        // read and preprocess the test file
         String code = BabyCobolParserUtils.readResource("/examples/next_sentence_test.babycob");
         String preprocessed = BabyCobolParserUtils.preprocess(code);
-        
-        // Parse to AST
-        var program = BabyCobolParserUtils.parseProgram(preprocessed);
-        assertNotNull(program, "Program should parse successfully");
-        
-        // Execute with interpreter and capture output
+
+        // parse to AST
+        ASTUtils.ASTResult astResult = ASTUtils.buildASTAndSymbolTable(preprocessed);
+        assertNotNull(astResult.root, "Program should parse successfully");
+
+        // execute with interpreter and capture output
         ByteArrayOutputStream outContent = new ByteArrayOutputStream();
         PrintStream originalOut = System.out;
         System.setOut(new PrintStream(outContent));
-        
+
         try {
-            BabyCobolInterpreter interpreter = new BabyCobolInterpreter();
-            interpreter.execute(program);
+            BabyCobolInterpreter interpreter = new BabyCobolInterpreter(astResult.symbolTable);
+            interpreter.execute(astResult.root);
         } finally {
             System.setOut(originalOut);
         }
-        
+
         String output = outContent.toString();
-        
-        // Validate output
+
+        // validate output
         assertTrue(output.contains("Start"), "Output should contain 'Start'");
         assertTrue(output.contains("In IF"), "Output should contain 'In IF'");
         assertTrue(output.contains("After IF"), "Output should contain 'After IF'");
-        assertFalse(output.contains("Should not print"), 
+        assertFalse(output.contains("Should not print"),
             "Output should NOT contain 'Should not print' (NEXT SENTENCE should skip it)");
     }
 
     @Test
     void testNextSentenceInNestedContext() throws Exception {
-        // Additional test: Verify NEXT SENTENCE works within nested structures
+        // check NEXT SENTENCE works within nested structures
         String code = BabyCobolParserUtils.readResource("/examples/next_sentence_test.babycob");
         String preprocessed = BabyCobolParserUtils.preprocess(code);
-        
-        // Just verify parsing succeeds with proper sentence structure
+
+        // checl parsing succeeds with proper sentence structure
         String tree = BabyCobolParserUtils.parseTree(preprocessed);
         assertNotNull(tree, "Parse tree should be generated for NEXT SENTENCE statements");
-        assertTrue(tree.contains("nextSentenceStmt"), 
-            "Parse tree should contain nextSentenceStmt node");
+        assertTrue(tree.contains("nextSentenceStmt"),"Parse tree should contain nextSentenceStmt node");
     }
 }

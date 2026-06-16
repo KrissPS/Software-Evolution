@@ -6,6 +6,7 @@ import java.util.Map;
 
 import java.util.Scanner;
 
+import preprocessing.NextSentenceException;
 import ast.*;
 
 public class BabyCobolInterpreter {
@@ -15,6 +16,10 @@ public class BabyCobolInterpreter {
     // to store and order paragraphs for PERFORM/THROUGH
     private Map<String, ASTNode> paragraphs;
     private java.util.List<String> paragraphNames;
+
+    public Map<String, Object> getMemory() {
+        return memory;
+    }
 
     public BabyCobolInterpreter(SymbolTable symbolTable) {
         this.symbolTable = symbolTable;
@@ -27,18 +32,47 @@ public class BabyCobolInterpreter {
     }
 
     /**
-     * initializes the runtime memory the symbol table
-     * numeric pictures default to 0, alphanumeric default to ""
+     * initializes the runtime memory from the symbol table
+     * numeric pictures (containing 9) default to 0.0
+     * alphabetic pictures default to "" (spaces)
+     * records (no picture) are not initialized themselves but their children are
+     * OCCURS arrays are initialized as Object[] of the appropriate size
      */
     private void initializeMemory() {
         for (Symbol symbol : symbolTable.getSymbols().values()) {
             String pic = symbol.getPicture();
-            if (pic != null && (pic.contains("9"))) {
-                memory.put(symbol.getName().toLowerCase(), 0.0);
-            } else {
-                memory.put(symbol.getName().toLowerCase(), "");
+
+            if (pic != null && !pic.isEmpty()) {
+                // this is an elementary field
+                if (symbol.getOccurs() > 0) {
+                    // OCCURS array-- creates an array of initialized values
+                    Object[] array = new Object[symbol.getOccurs()];
+                    for (int i = 0; i < symbol.getOccurs(); i++) {
+                        array[i] = defaultValueForPicture(pic);
+                    }
+                    memory.put(symbol.getName().toLowerCase(), array);
+                } else {
+                    memory.put(symbol.getName().toLowerCase(), defaultValueForPicture(pic));
+                }
+            } else if (symbol.getOccurs() > 0) {
+                // group record with OCCURS, initialize as placeholder
+                Object[] array = new Object[symbol.getOccurs()];
+                memory.put(symbol.getName().toLowerCase(), array);
             }
+            // records without OCCURS are not stored directly, their children are initialized
         }
+    }
+
+    /**
+     * determines the default value for a given PICTURE string
+     * numeric pictures (containing '9') default to 0.0
+     * all others (X, A, Z, S, V combinations) default to empty string (space-filled)
+     */
+    private Object defaultValueForPicture(String pic) {
+        if (pic != null && (pic.contains("9") || pic.contains("9"))) {
+            return 0.0;
+        }
+        return "";
     }
 
     /**
@@ -69,8 +103,12 @@ public class BabyCobolInterpreter {
         // 2) execution: running top level sentences and fall through paragraphs
         for (ASTNode child : procedureNode.getChildren()) {
             if (child.getType().equals("Sentence")) {
-                for (ASTNode statement : child.getChildren()) {
-                    executeStatement(statement);
+                try {
+                    for (ASTNode statement : child.getChildren()) {
+                        executeStatement(statement);
+                    }
+                } catch (NextSentenceException e) {
+                    // NEXT SENTENCE skips to the next sentence
                 }
             } else if (child.getType().equals("Paragraph")) {
                 // apparently in COBOL execution falls through into paragraphs 
@@ -83,8 +121,12 @@ public class BabyCobolInterpreter {
     private void executeParagraph(ASTNode paragraphNode) {
         for (ASTNode sentence : paragraphNode.getChildren()) {
             if (sentence.getType().equals("Sentence")) {
-                for (ASTNode statement : sentence.getChildren()) {
-                    executeStatement(statement);
+                try {
+                    for (ASTNode statement : sentence.getChildren()) {
+                        executeStatement(statement);
+                    }
+                } catch (NextSentenceException e) {
+                    // NEXT SENTENCE skips to the next sentence
                 }
             }
         }
@@ -125,6 +167,8 @@ public class BabyCobolInterpreter {
             case "PerformStmt":
                 executePerform(statement); // maybe complete?
                 break;
+            case "NextSentenceStmt":
+                throw new NextSentenceException();
             case "StopStmt":
                 System.exit(0);
                 break;
@@ -187,9 +231,55 @@ public class BabyCobolInterpreter {
         for (int i = 1; i < node.getChildren().size(); i++) {
             ASTNode target = node.getChildren().get(i);
             if (target.getType().equals("ToID")) {
-                memory.put(target.getText().toLowerCase(), value);
+                String varName = target.getText().toLowerCase();
+
+                // if the target is an OCCURS array, assign value to all elements
+                if (memory.containsKey(varName) && memory.get(varName) instanceof Object[]) {
+                    Object[] array = (Object[]) memory.get(varName);
+                    // if the source is also an array, copy element-wise. otherwise broadcast
+                    if (value instanceof Object[]) {
+                        Object[] srcArray = (Object[]) value;
+                        for (int j = 0; j < Math.min(array.length, srcArray.length); j++) {
+                            array[j] = srcArray[j];
+                        }
+                    } else {
+                        for (int j = 0; j < array.length; j++) {
+                            array[j] = coerceValue(value, array[j]);
+                        }
+                    }
+                } else {
+                    // coerce value to match the target's type if possible
+                    if (memory.containsKey(varName)) {
+                        value = coerceValue(value, memory.get(varName));
+                    }
+                    memory.put(varName, value);
+                }
             }
         }
+    }
+
+    /**
+     * coerce a source value to match the type/format of an existing value
+     * if existing is Double, try to parse source as double
+     * if existing is String, convert source to string
+     */
+    private Object coerceValue(Object source, Object existing) {
+        if (existing instanceof Double) {
+            if (source instanceof Double) return source;
+            if (source instanceof String) {
+                try {
+                    return Double.parseDouble((String) source);
+                } catch (NumberFormatException e) {
+                    return 0.0;
+                }
+            }
+            return 0.0;
+        }
+        if (existing instanceof String) {
+            if (source instanceof String) return source;
+            return String.valueOf(source);
+        }
+        return source;
     }
 
     private void executeIf(ASTNode node) {
@@ -514,7 +604,17 @@ public class BabyCobolInterpreter {
                 if (!memory.containsKey(varName)) {
                     throw new RuntimeException("Variable not initialized: " + varName);
                 }
-                return memory.get(varName);
+                Object val = memory.get(varName);
+                // if it's an array (OCCURS), return the first element as representative
+                // for display/expression purposes
+                if (val instanceof Object[]) {
+                    Object[] arr = (Object[]) val;
+                    if (arr.length > 0) {
+                        return arr[0];
+                    }
+                    return 0.0;
+                }
+                return val;
             case "AtomicInt":
                 return Double.parseDouble(node.getText());
             case "AtomicString":
@@ -531,11 +631,7 @@ public class BabyCobolInterpreter {
     }
 
     private boolean evaluateCondition(ASTNode conditionNode) {
-        // TODO: Not complete. this is a simplified condition evaluator. 
-        // for a full implementation we must recursively traverse:
-        // AnyExpression -> LogicalExpression -> RelationalExpression -> AdditiveExpression
-        
-        // eg for a simple RelationalExpression evaluation:
+        // for a simple RelationalExpression evaluation:
         if (conditionNode.getType().equals("RelationalExpression")) {
             double left = evaluateMathExpression(conditionNode.getChildren().get(0));
             String op = conditionNode.getChildren().get(1).getText(); // RelationalOp
@@ -547,6 +643,7 @@ public class BabyCobolInterpreter {
                 case ">": return left > right;
                 case "<=": return left <= right;
                 case ">=": return left >= right;
+                case "<>": return left != right;
                 default: throw new RuntimeException("Unknown relational operator: " + op);
             }
         }
@@ -560,16 +657,15 @@ public class BabyCobolInterpreter {
     }
 
     private double evaluateMathExpression(ASTNode exprNode) {
-        // TODO: not complete
         if (exprNode.getType().startsWith("Atomic")) {
             return Double.parseDouble(evaluateAtomic(exprNode).toString());
         }
         
-        // Recursively unpack AdditiveExpression, MultiplicativeExpression, etc.
+        // recursively unpack AdditiveExpression, MultiplicativeExpression, etc
         if (exprNode.getChildren().size() == 1) {
             return evaluateMathExpression(exprNode.getChildren().get(0));
         }
         
-        return 0.0; // Placeholder for deeper mathematical expression recursion
+        return 0.0; // placeholder for deeper mathematical expression recursion
     }
 }
