@@ -13,7 +13,12 @@ identification
     ;
 
 data
-    : DATA DIVISION DOT dataEntry*
+    : DATA DIVISION DOT dataLine*
+    ;
+
+dataLine
+    : dataEntry
+    | copyStmt
     ;
 
 // INT EQUALS LEVEL
@@ -23,10 +28,11 @@ dataEntry
 
 dataClause
     : (pictureClause | likeClause) occursClause?
+    | occursClause
     ;
 
 pictureClause
-    : PICTURE IS pictureValue
+    : PICTURE IS? pictureValue
     ;
 
 pictureValue
@@ -217,7 +223,7 @@ copyStmt
     ;
 
 replacingClause
-    : REPLACING COPY_LITERAL BY COPY_LITERAL
+    : REPLACING STRING BY STRING
     ;
 
 loopStmt

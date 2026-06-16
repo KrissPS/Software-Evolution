@@ -5,9 +5,16 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 import parser.BabyCobolParserBaseVisitor;
 import parser.BabyCobolParser;
 
+import java.util.Stack;
+
 public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
 
     private SymbolTable symbolTable = new SymbolTable();
+
+    // stack to track record hierarchy: each entry is the currently open record
+    // at a given level. when a new entry has a higher level, it becomes a child
+    // of the top of the stack. when the level equals or is lower, we pop.
+    private Stack<Symbol> recordStack = new Stack<>();
 
     public SymbolTable getSymbolTable() {
         return symbolTable;
@@ -42,8 +49,15 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
         ASTNode node = new ASTNode("Data");
 
         Integer firstLevel = null;
+        recordStack.clear();
 
-        for (BabyCobolParser.DataEntryContext entry : ctx.dataEntry()) {
+        for (BabyCobolParser.DataLineContext line : ctx.dataLine()) {
+            // skip COPY statements (already expanded by preprocessor)
+            if (line.copyStmt() != null) {
+                continue;
+            }
+
+            BabyCobolParser.DataEntryContext entry = line.dataEntry();
             int level = Integer.parseInt(entry.INT().getText());
             if (firstLevel == null) {
                 firstLevel = level;
@@ -78,20 +92,125 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
         int occurs = 0;
 
         for (BabyCobolParser.DataClauseContext clause : ctx.dataClause()) {
-            if (clause.pictureClause() != null) {
+            // check for standalone occursClause
+            if (clause.pictureClause() == null && clause.likeClause() == null && clause.occursClause() != null) {
+                occurs = Integer.parseInt(clause.occursClause().INT().getText());
+            } else if (clause.pictureClause() != null) {
                 picture = clause.pictureClause().pictureValue().getText();
+                // validate PICTURE string
+                validatePicture(picture, id);
+                if (clause.occursClause() != null) {
+                    occurs = Integer.parseInt(clause.occursClause().INT().getText());
+                }
             } else if (clause.likeClause() != null) {
                 like = clause.likeClause().ID().getText();
-            } else if (clause.occursClause() != null) {
-                occurs = Integer.parseInt(clause.occursClause().INT().getText());
+                if (clause.occursClause() != null) {
+                    occurs = Integer.parseInt(clause.occursClause().INT().getText());
+                }
             }
 
             node.addChild(visit(clause));
         }
 
-        symbolTable.addSymbol(new Symbol(id, level, picture, like, occurs));
+        // Determine parent from recordStack based on level hierarchy
+        String parentName = null;
+
+        // Pop entries from the stack whose level is >= the current level
+        // (sibling or above - we need the nearest level strictly less than current)
+        while (!recordStack.isEmpty() && recordStack.peek().getLevel() >= level) {
+            recordStack.pop();
+        }
+        if (!recordStack.isEmpty()) {
+            parentName = recordStack.peek().getName();
+        }
+
+        // LIKE resolution: copy the referenced symbol's picture (or entire record structure)
+        // LIKE inherits the basic type (picture) of the referenced field, not the occurring dimension
+        if (!like.isEmpty()) {
+            Symbol referenced = symbolTable.getSymbol(like);
+            if (referenced == null) {
+                throw new IllegalArgumentException(
+                    "LIKE references unknown symbol '" + like + "' in entry '" + id + "'");
+            }
+            picture = referenced.getPicture();
+            // if the referenced symbol has no picture (it's a record), copy its children
+            if (picture == null || picture.isEmpty()) {
+                // LIKE a record: copy its entire substructure
+                // mark this as a group by leaving picture empty
+                picture = "";
+                // record children will be inherited at runtime
+            }
+            // do not copy referenced.getOccurs() so LIKE resolves the base type only
+        }
+
+        // Create the symbol with parent name
+        Symbol symbol = new Symbol(id, level, picture, like, occurs, parentName);
+        symbolTable.addSymbol(symbol);
+
+        // If this is a record (no PICTURE, no LIKE that resolves to a field), push onto stack
+        if (picture.isEmpty() && like.isEmpty()) {
+            recordStack.push(symbol);
+        } else if (!like.isEmpty()) {
+            Symbol referenced = symbolTable.getSymbol(like);
+            if (referenced != null && (referenced.getPicture() == null || referenced.getPicture().isEmpty())) {
+                // LIKE copied a record, so this is also a record
+                recordStack.push(symbol);
+            }
+        }
 
         return node;
+    }
+
+    /**
+     * Validate a PICTURE string according to BabyCobol rules:
+     * - Only characters 9, A, X, Z, S, V allowed (plus digits for repetition counts and parentheses)
+     * - S may appear at most once
+     * - V may appear at most once
+     */
+    private void validatePicture(String picture, String fieldName) {
+        if (picture == null || picture.isEmpty()) {
+            throw new IllegalArgumentException(
+                "PICTURE clause for '" + fieldName + "' is empty");
+        }
+
+        String upper = picture.toUpperCase();
+        int sCount = 0;
+        int vCount = 0;
+
+        for (int i = 0; i < upper.length(); i++) {
+            char c = upper.charAt(i);
+            switch (c) {
+                case 'S':
+                    sCount++;
+                    if (sCount > 1) {
+                        throw new IllegalArgumentException(
+                            "PICTURE for '" + fieldName + "' has multiple S symbols; only one allowed");
+                    }
+                    break;
+                case 'V':
+                    vCount++;
+                    if (vCount > 1) {
+                        throw new IllegalArgumentException(
+                            "PICTURE for '" + fieldName + "' has multiple V symbols; only one allowed");
+                    }
+                    break;
+                case '9':
+                case 'A':
+                case 'X':
+                case 'Z':
+                case '(':
+                case ')':
+                    // valid picture characters
+                    break;
+                default:
+                    if (Character.isDigit(c)) {
+                        // digits are valid as repetition counts
+                        break;
+                    }
+                    throw new IllegalArgumentException(
+                        "Invalid character '" + c + "' in PICTURE for '" + fieldName + "': " + picture);
+            }
+        }
     }
 
     @Override
@@ -475,6 +594,11 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
     }
 
     @Override
+    public ASTNode visitNextSentenceStmt(BabyCobolParser.NextSentenceStmtContext ctx) {
+        return new ASTNode("NextSentenceStmt");
+    }
+
+    @Override
     public ASTNode visitSubtractStmt(BabyCobolParser.SubtractStmtContext ctx) {
         ASTNode node = new ASTNode("SubtractStmt");
         for (BabyCobolParser.AtomicContext atomic : ctx.atomic()) {
@@ -584,6 +708,8 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
             return new ASTNode("AtomicID", ctx.ID().getText());
         } else if (ctx.INT() != null) {
             return new ASTNode("AtomicInt", ctx.INT().getText());
+        } else if (ctx.DECIMAL() != null) {
+            return new ASTNode("AtomicDecimal", ctx.DECIMAL().getText());
         } else if (ctx.STRING() != null) {
             return new ASTNode("AtomicString", ctx.STRING().getText());
         }

@@ -6,13 +6,19 @@ public class Symbol {
     private String picture;
     private String like;
     private int occurs;
+    private String parentName; // name of the parent record, null if top level
 
     public Symbol(String name, int level, String picture, String like, int occurs) {
+        this(name, level, picture, like, occurs, null);
+    }
+
+    public Symbol(String name, int level, String picture, String like, int occurs, String parentName) {
         this.name = name;
         this.level = level;
         this.picture = picture;
         this.like = like;
         this.occurs = occurs;
+        this.parentName = parentName;
     }
 
     public String getName() {
@@ -35,6 +41,14 @@ public class Symbol {
         return occurs;
     }
 
+    public String getParentName() {
+        return parentName;
+    }
+
+    public boolean isRecord() {
+        return (picture == null || picture.isEmpty()) && (like == null || like.isEmpty());
+    }
+
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
@@ -47,6 +61,9 @@ public class Symbol {
         }
         if (occurs > 0) {
             sb.append(" | Occurs: ").append(occurs);
+        }
+        if (parentName != null && !parentName.isEmpty()) {
+            sb.append(" | Parent: ").append(parentName);
         }
         return sb.toString();
     }
