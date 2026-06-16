@@ -720,4 +720,9 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
     public ASTNode visitRelationalOperator(BabyCobolParser.RelationalOperatorContext ctx) {
         return new ASTNode("RelationalOperator", ctx.getText());
     }
+
+    @Override
+    public ASTNode visitGoToStmt(BabyCobolParser.GoToStmtContext ctx) {
+        return new ASTNode("GoToStmt", ctx.ID().getText());
+    }
 }
