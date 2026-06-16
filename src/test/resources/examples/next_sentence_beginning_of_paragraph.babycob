@@ -1,0 +1,9 @@
+IDENTIFICATION DIVISION.
+PROGRAM-ID. NextSentenceBeginningOfParagraph.
+
+PROCEDURE DIVISION.
+PARA-A.
+    NEXT SENTENCE
+    DISPLAY "Dead code 1"
+    DISPLAY "Dead code 2".
+    DISPLAY "Alive".
