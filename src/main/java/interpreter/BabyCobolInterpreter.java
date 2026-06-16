@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Scanner;
 
 import preprocessing.NextSentenceException;
+import preprocessing.GoToException;
 import ast.*;
 
 public class BabyCobolInterpreter {
@@ -91,7 +92,7 @@ public class BabyCobolInterpreter {
     }
 
     private void executeProcedure(ASTNode procedureNode) {
-        // 1) pre-pass: indexing all paragraphs so they can be found by PERFORM
+        // index paragraphs
         for (ASTNode child : procedureNode.getChildren()) {
             if (child.getType().equals("Paragraph")) {
                 String paraName = child.getText().toLowerCase();
@@ -100,21 +101,23 @@ public class BabyCobolInterpreter {
             }
         }
 
-        // 2) execution: running top level sentences and fall through paragraphs
-        for (ASTNode child : procedureNode.getChildren()) {
-            if (child.getType().equals("Sentence")) {
-                try {
-                    for (ASTNode statement : child.getChildren()) {
-                        executeStatement(statement);
+        try {
+            for (ASTNode child : procedureNode.getChildren()) {
+                if (child.getType().equals("Sentence")) {
+                    try {
+                        for (ASTNode statement : child.getChildren()) {
+                            executeStatement(statement);
+                        }
+                    } catch (NextSentenceException e) {
                     }
-                } catch (NextSentenceException e) {
-                    // NEXT SENTENCE skips to the next sentence
+                } else if (child.getType().equals("Paragraph")) {
+
+                    executeParagraph(child);
                 }
-            } else if (child.getType().equals("Paragraph")) {
-                // apparently in COBOL execution falls through into paragraphs 
-                // unless stopped by a GO TO or STOP RUN
-                executeParagraph(child);
             }
+
+        } catch (GoToException e) {
+            executeParagraphByName(e.getTarget());
         }
     }
 
@@ -130,6 +133,18 @@ public class BabyCobolInterpreter {
                 }
             }
         }
+    }
+
+    private void executeParagraphByName(String name) {
+
+        ASTNode paragraph = paragraphs.get(name.toLowerCase());
+
+        if (paragraph == null) {
+            throw new RuntimeException(
+                    "Paragraph not found: " + name);
+        }
+
+        executeParagraph(paragraph);
     }
 
     private void executeStatement(ASTNode statement) {
@@ -171,6 +186,9 @@ public class BabyCobolInterpreter {
                 throw new NextSentenceException();
             case "StopStmt":
                 System.exit(0);
+                break;
+            case "GoToStmt":
+                executeGoTo(statement);
                 break;
             default:
                 System.err.println("Unimplemented statement type: " + statement.getType());
@@ -667,5 +685,36 @@ public class BabyCobolInterpreter {
         }
         
         return 0.0; // placeholder for deeper mathematical expression recursion
+    }
+
+    private void executeGoTo(ASTNode node) {
+
+        String target = node.getText().toLowerCase();
+
+        if (paragraphs.containsKey(target)) {
+            throw new GoToException(target);
+        }
+
+        if (memory.containsKey(target)) {
+
+            Object value = memory.get(target);
+
+            if (!(value instanceof String)) {
+                throw new RuntimeException(
+                        "GO TO field '" + target + "' does not contain a paragraph name");
+            }
+
+            String runtimeTarget = ((String) value).toLowerCase();
+
+            if (!paragraphs.containsKey(runtimeTarget)) {
+                throw new RuntimeException(
+                        "GO TO runtime target does not exist: " + runtimeTarget);
+            }
+
+            throw new GoToException(runtimeTarget);
+        }
+
+        throw new RuntimeException(
+                "Unknown GO TO target or field: " + target);
     }
 }
