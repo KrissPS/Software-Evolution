@@ -771,4 +771,18 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
 
         return node;
     }
+
+    @Override
+    public ASTNode visitSignalStmt(BabyCobolParser.SignalStmtContext ctx) {
+
+        ASTNode node = new ASTNode("SignalStmt");
+
+        if (ctx.ID() != null) {
+            node.addChild(new ASTNode("Target", ctx.ID().getText()));
+        } else {
+            node.addChild(new ASTNode("Off"));
+        }
+
+        return node;
+    }
 }
