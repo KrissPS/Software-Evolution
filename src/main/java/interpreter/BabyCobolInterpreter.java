@@ -20,6 +20,10 @@ public class BabyCobolInterpreter {
     private Map<String, ASTNode> paragraphs;
     private java.util.List<String> paragraphNames;
 
+    private Map<String, String> alteredTargets = new HashMap<>();
+
+    private String currentParagraph;
+
     public Map<String, Object> getMemory() {
         return memory;
     }
@@ -124,6 +128,7 @@ public class BabyCobolInterpreter {
     }
 
     private void executeParagraph(ASTNode paragraphNode) {
+        currentParagraph = paragraphNode.getText().toLowerCase();
         for (ASTNode sentence : paragraphNode.getChildren()) {
             if (sentence.getType().equals("Sentence")) {
                 try {
@@ -139,14 +144,26 @@ public class BabyCobolInterpreter {
 
     private void executeParagraphByName(String name) {
 
-        ASTNode paragraph = paragraphs.get(name.toLowerCase());
+        int index = paragraphNames.indexOf(name.toLowerCase());
 
-        if (paragraph == null) {
-            throw new RuntimeException(
-                    "Paragraph not found: " + name);
+        if (index == -1) {
+            throw new RuntimeException("Paragraph not found: " + name);
         }
 
-        executeParagraph(paragraph);
+        while (index < paragraphNames.size()) {
+            ASTNode paragraph = paragraphs.get(paragraphNames.get(index));
+
+            try {
+                executeParagraph(paragraph);
+                index++;   // continúa con el siguiente párrafo
+            } catch (GoToException e) {
+                index = paragraphNames.indexOf(e.getTarget().toLowerCase());
+
+                if (index == -1) {
+                    throw new RuntimeException("Paragraph not found: " + e.getTarget());
+                }
+            }
+        }
     }
 
     private void executeStatement(ASTNode statement) {
@@ -193,6 +210,9 @@ public class BabyCobolInterpreter {
                 break;
             case "CallStmt":
                 executeCall(statement);
+                break;
+            case "AlterStmt":
+                executeAlter(statement);
                 break;
             default:
                 System.err.println("Unimplemented statement type: " + statement.getType());
@@ -695,6 +715,12 @@ public class BabyCobolInterpreter {
 
         String target = node.getText().toLowerCase();
 
+        if (currentParagraph != null &&
+                alteredTargets.containsKey(currentParagraph)) {
+
+            target = alteredTargets.get(currentParagraph);
+        }
+
         if (paragraphs.containsKey(target)) {
             throw new GoToException(target);
         }
@@ -748,5 +774,43 @@ public class BabyCobolInterpreter {
         } catch (Exception e) {
             throw new RuntimeException("CALL failed for program: " + programName, e);
         }
+    }
+
+    private void executeAlter(ASTNode node) {
+
+        String source = node.getChildren().get(0).getText().toLowerCase();
+        String target = node.getChildren().get(1).getText().toLowerCase();
+
+        ASTNode paragraph = paragraphs.get(source);
+
+        if (paragraph == null) {
+            throw new RuntimeException("Unknown paragraph: " + source);
+        }
+
+        if (paragraph.getChildren().size() != 1) {
+            throw new RuntimeException(
+                    "ALTER requires exactly one sentence.");
+        }
+
+        ASTNode sentence = paragraph.getChildren().get(0);
+
+        if (sentence.getChildren().size() != 1) {
+            throw new RuntimeException(
+                    "ALTER requires exactly one statement.");
+        }
+
+        ASTNode stmt = sentence.getChildren().get(0);
+
+        if (!stmt.getType().equals("GoToStmt")) {
+            throw new RuntimeException(
+                    "ALTER only works on paragraphs containing one GO TO.");
+        }
+
+        if (!paragraphs.containsKey(target)) {
+            throw new RuntimeException(
+                    "Unknown ALTER target: " + target);
+        }
+
+        alteredTargets.put(source, target);
     }
 }

@@ -760,4 +760,15 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
         node.addChild(visit(ctx.atomic()));
         return node;
     }
+
+    @Override
+    public ASTNode visitAlterStmt(BabyCobolParser.AlterStmtContext ctx) {
+
+        ASTNode node = new ASTNode("AlterStmt");
+
+        node.addChild(new ASTNode("Source", ctx.ID(0).getText()));
+        node.addChild(new ASTNode("Target", ctx.ID(1).getText()));
+
+        return node;
+    }
 }
