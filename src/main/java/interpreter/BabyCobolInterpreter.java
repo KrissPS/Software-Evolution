@@ -6,9 +6,11 @@ import java.util.Map;
 
 import java.util.Scanner;
 
+import preprocessing.BabyCobolParserUtils;
 import preprocessing.NextSentenceException;
 import preprocessing.GoToException;
 import ast.*;
+import preprocessing.StopProgramException;
 
 public class BabyCobolInterpreter {
     private SymbolTable symbolTable;
@@ -185,10 +187,12 @@ public class BabyCobolInterpreter {
             case "NextSentenceStmt":
                 throw new NextSentenceException();
             case "StopStmt":
-                System.exit(0);
-                break;
+                throw new StopProgramException();
             case "GoToStmt":
                 executeGoTo(statement);
+                break;
+            case "CallStmt":
+                executeCall(statement);
                 break;
             default:
                 System.err.println("Unimplemented statement type: " + statement.getType());
@@ -716,5 +720,33 @@ public class BabyCobolInterpreter {
 
         throw new RuntimeException(
                 "Unknown GO TO target or field: " + target);
+    }
+
+    private void executeCall(ASTNode node) {
+        String programName = node.getText();
+
+        try {
+            String source = BabyCobolParserUtils.readResource(
+                    "/examples/" + programName + ".babycob"
+            );
+
+            String processed = BabyCobolParserUtils.preprocess(source);
+
+            ASTUtils.ASTResult result =
+                    ASTUtils.buildASTAndSymbolTable(processed);
+
+            BabyCobolInterpreter child =
+                    new BabyCobolInterpreter(result.symbolTable);
+
+            try {
+                child.execute(result.root);
+            } catch (StopProgramException e) {
+                // Normal termination of the called program.
+                // Return to the caller.
+            }
+
+        } catch (Exception e) {
+            throw new RuntimeException("CALL failed for program: " + programName, e);
+        }
     }
 }

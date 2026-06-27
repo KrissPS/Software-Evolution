@@ -48,7 +48,17 @@ occursClause
     ;
 
 procedure
-    : PROCEDURE DIVISION DOT sentence* paragraph*
+    : PROCEDURE DIVISION usingProcedureClause? DOT sentence* paragraph*
+    ;
+
+usingProcedureClause
+    : USING procedureParameter+
+    ;
+
+procedureParameter
+    : BY REFERENCE ID
+    | BY CONTENT atomic
+    | BY VALUE atomic
     ;
 
 paragraph
@@ -74,6 +84,7 @@ statement
     | loopStmt
     | nextSentenceStmt
     | goToStmt
+    | callStmt
     ;
 
 displayStmt
@@ -271,4 +282,18 @@ nextSentenceStmt
 
 goToStmt
     : GO TO ID
+    ;
+
+callStmt
+    : CALL ID usingCallClause?
+    ;
+
+usingCallClause
+    : USING callArgument+
+    ;
+
+callArgument
+    : BY REFERENCE ID
+    | BY CONTENT atomic
+    | BY VALUE atomic
     ;
