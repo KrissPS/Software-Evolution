@@ -85,6 +85,7 @@ statement
     | nextSentenceStmt
     | goToStmt
     | callStmt
+    | alterStmt
     ;
 
 displayStmt
@@ -296,4 +297,8 @@ callArgument
     : BY REFERENCE ID
     | BY CONTENT atomic
     | BY VALUE atomic
+    ;
+
+alterStmt
+    : ALTER ID TO PROCEED TO ID
     ;

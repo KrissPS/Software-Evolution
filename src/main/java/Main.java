@@ -7,7 +7,7 @@ import ast.ASTUtils;
 public class Main {
     public static void main(String[] args) throws Exception {
 
-        String source = BabyCobolParserUtils.readResource("/examples/test_call.babycob");
+        String source = BabyCobolParserUtils.readResource("/examples/test_alter.babycob");
 
         String processedSource = BabyCobolParserUtils.preprocess(source);
 
