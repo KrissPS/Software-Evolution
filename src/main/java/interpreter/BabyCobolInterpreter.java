@@ -24,6 +24,8 @@ public class BabyCobolInterpreter {
 
     private String currentParagraph;
 
+    private String signalHandler = null;
+
     public Map<String, Object> getMemory() {
         return memory;
     }
@@ -117,13 +119,23 @@ public class BabyCobolInterpreter {
                     } catch (NextSentenceException e) {
                     }
                 } else if (child.getType().equals("Paragraph")) {
-
                     executeParagraph(child);
                 }
             }
 
         } catch (GoToException e) {
             executeParagraphByName(e.getTarget());
+
+        } catch (RuntimeException e) {
+
+            if (signalHandler != null) {
+                String handler = signalHandler;
+                signalHandler = null;        // avoid recursive SIGNALs
+                executeParagraphByName(handler);
+                return;
+            }
+
+            throw e;
         }
     }
 
@@ -155,12 +167,29 @@ public class BabyCobolInterpreter {
 
             try {
                 executeParagraph(paragraph);
-                index++;   // continúa con el siguiente párrafo
-            } catch (GoToException e) {
+                index++;
+            }
+            catch (GoToException e) {
                 index = paragraphNames.indexOf(e.getTarget().toLowerCase());
 
                 if (index == -1) {
                     throw new RuntimeException("Paragraph not found: " + e.getTarget());
+                }
+            }
+            catch (RuntimeException e) {
+
+                if (signalHandler != null) {
+                    String handler = signalHandler;
+                    signalHandler = null;     // Disable SIGNAL while executing it
+
+                    index = paragraphNames.indexOf(handler);
+
+                    if (index == -1) {
+                        throw new RuntimeException(
+                                "Signal paragraph not found: " + handler);
+                    }
+                } else {
+                    throw e;
                 }
             }
         }
@@ -213,6 +242,9 @@ public class BabyCobolInterpreter {
                 break;
             case "AlterStmt":
                 executeAlter(statement);
+                break;
+            case "SignalStmt":
+                executeSignal(statement);
                 break;
             default:
                 System.err.println("Unimplemented statement type: " + statement.getType());
@@ -812,5 +844,21 @@ public class BabyCobolInterpreter {
         }
 
         alteredTargets.put(source, target);
+    }
+
+    private void executeSignal(ASTNode node) {
+
+        ASTNode child = node.getChildren().get(0);
+
+        if (child.getType().equals("Off")) {
+            signalHandler = null;
+        } else {
+            if (!paragraphs.containsKey(child.getText().toLowerCase())) {
+                throw new RuntimeException(
+                        "Unknown SIGNAL paragraph: " + child.getText());
+            }
+
+            signalHandler = child.getText().toLowerCase();
+        }
     }
 }

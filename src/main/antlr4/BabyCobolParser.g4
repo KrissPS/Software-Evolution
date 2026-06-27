@@ -86,6 +86,7 @@ statement
     | goToStmt
     | callStmt
     | alterStmt
+    | signalStmt
     ;
 
 displayStmt
@@ -301,4 +302,9 @@ callArgument
 
 alterStmt
     : ALTER ID TO PROCEED TO ID
+    ;
+
+signalStmt
+    : SIGNAL ID ON ERROR
+    | SIGNAL OFF ON ERROR
     ;
