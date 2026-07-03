@@ -299,8 +299,20 @@ public class BabyCobolInterpreter {
     }
 
     private void executeMove(ASTNode node) {
+        ASTNode sourceNode = node.getChildren().get(0);
 
-        Object value = evaluateAtomic(node.getChildren().get(0));
+        if (sourceNode.getType().equals("AtomicID")) {
+
+            Symbol source = symbolTable.getSymbol(sourceNode.getText());
+
+            if (source != null && source.isRecord()) {
+
+                moveRecord(sourceNode.getText(), node);
+                return;
+            }
+        }
+
+        Object value = evaluateAtomic(sourceNode);
 
         for (int i = 1; i < node.getChildren().size(); i++) {
 
@@ -375,6 +387,45 @@ public class BabyCobolInterpreter {
                     actualValue = coerceValue(actualValue, memory.get(varName));
                 }
                 memory.put(varName, actualValue);
+            }
+        }
+    }
+
+    private void moveRecord(String sourceRecord, ASTNode moveNode) {
+
+        Symbol source = symbolTable.getSymbol(sourceRecord);
+
+        for (int i = 1; i < moveNode.getChildren().size(); i++) {
+
+            ASTNode targetNode = moveNode.getChildren().get(i);
+
+            if (!targetNode.getType().equals("ToID"))
+                continue;
+
+            Symbol target = symbolTable.getSymbol(targetNode.getText());
+
+            if (target == null || !target.isRecord())
+                continue;
+
+            for (Symbol srcField : symbolTable.getSymbols().values()) {
+
+                if (!source.getName().equalsIgnoreCase(srcField.getParentName()))
+                    continue;
+
+                for (Symbol dstField : symbolTable.getSymbols().values()) {
+
+                    if (!target.getName().equalsIgnoreCase(dstField.getParentName()))
+                        continue;
+
+                    if (srcField.getName().equalsIgnoreCase(dstField.getName())) {
+
+                        Object value = memory.get(srcField.getName().toLowerCase());
+
+                        if (value != null) {
+                            memory.put(dstField.getName().toLowerCase(), value);
+                        }
+                    }
+                }
             }
         }
     }
