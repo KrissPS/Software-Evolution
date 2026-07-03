@@ -299,35 +299,82 @@ public class BabyCobolInterpreter {
     }
 
     private void executeMove(ASTNode node) {
-        Object value = evaluateAtomic(node.getChildren().get(0));
-        
-        // looping through all target IDs
-        for (int i = 1; i < node.getChildren().size(); i++) {
-            ASTNode target = node.getChildren().get(i);
-            if (target.getType().equals("ToID")) {
-                String varName = target.getText().toLowerCase();
 
-                // if the target is an OCCURS array, assign value to all elements
-                if (memory.containsKey(varName) && memory.get(varName) instanceof Object[]) {
-                    Object[] array = (Object[]) memory.get(varName);
-                    // if the source is also an array, copy element-wise. otherwise broadcast
-                    if (value instanceof Object[]) {
-                        Object[] srcArray = (Object[]) value;
-                        for (int j = 0; j < Math.min(array.length, srcArray.length); j++) {
-                            array[j] = srcArray[j];
+        Object value = evaluateAtomic(node.getChildren().get(0));
+
+        for (int i = 1; i < node.getChildren().size(); i++) {
+
+            ASTNode target = node.getChildren().get(i);
+
+            if (!target.getType().equals("ToID")) {
+                continue;
+            }
+
+            String varName = target.getText().toLowerCase();
+
+            Object actualValue = value;
+
+            if ("__SPACES__".equals(value)) {
+                Symbol symbol = symbolTable.getSymbol(varName);
+
+                if (symbol != null && symbol.getPicture() != null) {
+
+                    String picture = symbol.getPicture();
+                    int length = 0;
+
+                    for (int k = 0; k < picture.length(); k++) {
+                        char c = picture.charAt(k);
+
+                        if (c == 'X' || c == 'A' || c == '9' || c == 'Z') {
+
+                            if (k + 1 < picture.length() && picture.charAt(k + 1) == '(') {
+
+                                int close = picture.indexOf(')', k + 1);
+
+                                int count = Integer.parseInt(
+                                        picture.substring(k + 2, close));
+
+                                length += count;
+                                k = close;
+
+                            } else {
+                                length++;
+                            }
                         }
-                    } else {
-                        for (int j = 0; j < array.length; j++) {
-                            array[j] = coerceValue(value, array[j]);
-                        }
+                    }
+                    actualValue = " ".repeat(length);
+                } else {
+                    actualValue = "";
+                }
+            } else if ("__HIGH_VALUES__".equals(value)) {
+                actualValue = Character.toString(Character.MAX_VALUE);
+            } else if ("__LOW_VALUES__".equals(value)) {
+                actualValue = Character.toString(Character.MIN_VALUE);
+            }
+
+            if (memory.containsKey(varName) && memory.get(varName) instanceof Object[]) {
+
+                Object[] array = (Object[]) memory.get(varName);
+
+                if (actualValue instanceof Object[]) {
+
+                    Object[] srcArray = (Object[]) actualValue;
+
+                    for (int j = 0; j < Math.min(array.length, srcArray.length); j++) {
+                        array[j] = srcArray[j];
                     }
                 } else {
-                    // coerce value to match the target's type if possible
-                    if (memory.containsKey(varName)) {
-                        value = coerceValue(value, memory.get(varName));
+
+                    for (int j = 0; j < array.length; j++) {
+                        array[j] = coerceValue(actualValue, array[j]);
                     }
-                    memory.put(varName, value);
                 }
+
+            } else {
+                if (memory.containsKey(varName)) {
+                    actualValue = coerceValue(actualValue, memory.get(varName));
+                }
+                memory.put(varName, actualValue);
             }
         }
     }
@@ -671,35 +718,46 @@ public class BabyCobolInterpreter {
     // --- Expression and Value Evaluation ---
 
     private Object evaluateAtomic(ASTNode node) {
-        // recall that BuildASTVisitor creates AST nodes like "AtomicID", "AtomicInt", "AtomicString"
         switch (node.getType()) {
+
             case "AtomicID":
                 String varName = node.getText().toLowerCase();
+
                 if (!memory.containsKey(varName)) {
                     throw new RuntimeException("Variable not initialized: " + varName);
                 }
+
                 Object val = memory.get(varName);
-                // if it's an array (OCCURS), return the first element as representative
-                // for display/expression purposes
+
                 if (val instanceof Object[]) {
                     Object[] arr = (Object[]) val;
-                    if (arr.length > 0) {
-                        return arr[0];
-                    }
-                    return 0.0;
+                    return arr.length > 0 ? arr[0] : 0.0;
                 }
+
                 return val;
+
             case "AtomicInt":
+            case "AtomicDecimal":
                 return Double.parseDouble(node.getText());
+
             case "AtomicString":
-                // remove enclosing quotes
                 String text = node.getText();
-                return text.substring(1, text.length() - 1); 
+                return text.substring(1, text.length() - 1);
+
+            case "AtomicSpaces":
+                return "__SPACES__";
+
+            case "AtomicHighValues":
+                return "__HIGH_VALUES__";
+
+            case "AtomicLowValues":
+                return "__LOW_VALUES__";
+
             default:
-                // handle unwrapped atomic nodes if any
-                if (node.getChildren().size() > 0) {
+                if (!node.getChildren().isEmpty()) {
                     return evaluateAtomic(node.getChildren().get(0));
                 }
+
                 return node.getText();
         }
     }
