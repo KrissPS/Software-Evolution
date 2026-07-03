@@ -732,10 +732,21 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
             return new ASTNode("AtomicID", resolvedName);
         } else if (ctx.INT() != null) {
             return new ASTNode("AtomicInt", ctx.INT().getText());
+
         } else if (ctx.DECIMAL() != null) {
             return new ASTNode("AtomicDecimal", ctx.DECIMAL().getText());
+
         } else if (ctx.STRING() != null) {
             return new ASTNode("AtomicString", ctx.STRING().getText());
+
+        } else if (ctx.SPACES() != null) {
+            return new ASTNode("AtomicSpaces", ctx.SPACES().getText());
+
+        } else if (ctx.HIGH_VALUES() != null) {
+            return new ASTNode("AtomicHighValues", ctx.HIGH_VALUES().getText());
+
+        } else if (ctx.LOW_VALUES() != null) {
+            return new ASTNode("AtomicLowValues", ctx.LOW_VALUES().getText());
         }
         return new ASTNode("Atomic");
     }

@@ -52,7 +52,17 @@ occursClause
     ;
 
 procedure
-    : PROCEDURE DIVISION DOT sentence* paragraph*
+    : PROCEDURE DIVISION usingProcedureClause? DOT sentence* paragraph*
+    ;
+
+usingProcedureClause
+    : USING procedureParameter+
+    ;
+
+procedureParameter
+    : BY REFERENCE ID
+    | BY CONTENT atomic
+    | BY VALUE atomic
     ;
 
 paragraph
@@ -78,6 +88,9 @@ statement
     | loopStmt
     | nextSentenceStmt
     | goToStmt
+    | callStmt
+    | alterStmt
+    | signalStmt
     ;
 
 displayStmt
@@ -258,6 +271,9 @@ atomic
     | INT
     | DECIMAL
     | STRING
+    | SPACES
+    | HIGH_VALUES
+    | LOW_VALUES
     ;
 
 relationalOperator
@@ -275,4 +291,27 @@ nextSentenceStmt
 
 goToStmt
     : GO TO ID
+    ;
+
+callStmt
+    : CALL ID usingCallClause?
+    ;
+
+usingCallClause
+    : USING callArgument+
+    ;
+
+callArgument
+    : BY REFERENCE ID
+    | BY CONTENT atomic
+    | BY VALUE atomic
+    ;
+
+alterStmt
+    : ALTER ID TO PROCEED TO ID
+    ;
+
+signalStmt
+    : SIGNAL ID ON ERROR
+    | SIGNAL OFF ON ERROR
     ;

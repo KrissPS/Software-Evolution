@@ -6,8 +6,11 @@ import java.util.Map;
 
 import java.util.Scanner;
 
+import preprocessing.BabyCobolParserUtils;
 import preprocessing.NextSentenceException;
+import preprocessing.GoToException;
 import ast.*;
+import preprocessing.StopProgramException;
 
 public class BabyCobolInterpreter {
     private SymbolTable symbolTable;
@@ -16,6 +19,12 @@ public class BabyCobolInterpreter {
     // to store and order paragraphs for PERFORM/THROUGH
     private Map<String, ASTNode> paragraphs;
     private java.util.List<String> paragraphNames;
+
+    private Map<String, String> alteredTargets = new HashMap<>();
+
+    private String currentParagraph;
+
+    private String signalHandler = null;
 
     public Map<String, Object> getMemory() {
         return memory;
@@ -91,7 +100,7 @@ public class BabyCobolInterpreter {
     }
 
     private void executeProcedure(ASTNode procedureNode) {
-        // 1) pre-pass: indexing all paragraphs so they can be found by PERFORM
+        // index paragraphs
         for (ASTNode child : procedureNode.getChildren()) {
             if (child.getType().equals("Paragraph")) {
                 String paraName = child.getText().toLowerCase();
@@ -100,25 +109,38 @@ public class BabyCobolInterpreter {
             }
         }
 
-        // 2) execution: running top level sentences and fall through paragraphs
-        for (ASTNode child : procedureNode.getChildren()) {
-            if (child.getType().equals("Sentence")) {
-                try {
-                    for (ASTNode statement : child.getChildren()) {
-                        executeStatement(statement);
+        try {
+            for (ASTNode child : procedureNode.getChildren()) {
+                if (child.getType().equals("Sentence")) {
+                    try {
+                        for (ASTNode statement : child.getChildren()) {
+                            executeStatement(statement);
+                        }
+                    } catch (NextSentenceException e) {
                     }
-                } catch (NextSentenceException e) {
-                    // NEXT SENTENCE skips to the next sentence
+                } else if (child.getType().equals("Paragraph")) {
+                    executeParagraph(child);
                 }
-            } else if (child.getType().equals("Paragraph")) {
-                // apparently in COBOL execution falls through into paragraphs 
-                // unless stopped by a GO TO or STOP RUN
-                executeParagraph(child);
             }
+
+        } catch (GoToException e) {
+            executeParagraphByName(e.getTarget());
+
+        } catch (RuntimeException e) {
+
+            if (signalHandler != null) {
+                String handler = signalHandler;
+                signalHandler = null;        // avoid recursive SIGNALs
+                executeParagraphByName(handler);
+                return;
+            }
+
+            throw e;
         }
     }
 
     private void executeParagraph(ASTNode paragraphNode) {
+        currentParagraph = paragraphNode.getText().toLowerCase();
         for (ASTNode sentence : paragraphNode.getChildren()) {
             if (sentence.getType().equals("Sentence")) {
                 try {
@@ -127,6 +149,47 @@ public class BabyCobolInterpreter {
                     }
                 } catch (NextSentenceException e) {
                     // NEXT SENTENCE skips to the next sentence
+                }
+            }
+        }
+    }
+
+    private void executeParagraphByName(String name) {
+
+        int index = paragraphNames.indexOf(name.toLowerCase());
+
+        if (index == -1) {
+            throw new RuntimeException("Paragraph not found: " + name);
+        }
+
+        while (index < paragraphNames.size()) {
+            ASTNode paragraph = paragraphs.get(paragraphNames.get(index));
+
+            try {
+                executeParagraph(paragraph);
+                index++;
+            }
+            catch (GoToException e) {
+                index = paragraphNames.indexOf(e.getTarget().toLowerCase());
+
+                if (index == -1) {
+                    throw new RuntimeException("Paragraph not found: " + e.getTarget());
+                }
+            }
+            catch (RuntimeException e) {
+
+                if (signalHandler != null) {
+                    String handler = signalHandler;
+                    signalHandler = null;     // Disable SIGNAL while executing it
+
+                    index = paragraphNames.indexOf(handler);
+
+                    if (index == -1) {
+                        throw new RuntimeException(
+                                "Signal paragraph not found: " + handler);
+                    }
+                } else {
+                    throw e;
                 }
             }
         }
@@ -170,7 +233,18 @@ public class BabyCobolInterpreter {
             case "NextSentenceStmt":
                 throw new NextSentenceException();
             case "StopStmt":
-                System.exit(0);
+                throw new StopProgramException();
+            case "GoToStmt":
+                executeGoTo(statement);
+                break;
+            case "CallStmt":
+                executeCall(statement);
+                break;
+            case "AlterStmt":
+                executeAlter(statement);
+                break;
+            case "SignalStmt":
+                executeSignal(statement);
                 break;
             default:
                 System.err.println("Unimplemented statement type: " + statement.getType());
@@ -225,34 +299,132 @@ public class BabyCobolInterpreter {
     }
 
     private void executeMove(ASTNode node) {
-        Object value = evaluateAtomic(node.getChildren().get(0));
-        
-        // looping through all target IDs
-        for (int i = 1; i < node.getChildren().size(); i++) {
-            ASTNode target = node.getChildren().get(i);
-            if (target.getType().equals("ToID")) {
-                String varName = target.getText().toLowerCase();
+        ASTNode sourceNode = node.getChildren().get(0);
 
-                // if the target is an OCCURS array, assign value to all elements
-                if (memory.containsKey(varName) && memory.get(varName) instanceof Object[]) {
-                    Object[] array = (Object[]) memory.get(varName);
-                    // if the source is also an array, copy element-wise. otherwise broadcast
-                    if (value instanceof Object[]) {
-                        Object[] srcArray = (Object[]) value;
-                        for (int j = 0; j < Math.min(array.length, srcArray.length); j++) {
-                            array[j] = srcArray[j];
+        if (sourceNode.getType().equals("AtomicID")) {
+
+            Symbol source = symbolTable.getSymbol(sourceNode.getText());
+
+            if (source != null && source.isRecord()) {
+
+                moveRecord(sourceNode.getText(), node);
+                return;
+            }
+        }
+
+        Object value = evaluateAtomic(sourceNode);
+
+        for (int i = 1; i < node.getChildren().size(); i++) {
+
+            ASTNode target = node.getChildren().get(i);
+
+            if (!target.getType().equals("ToID")) {
+                continue;
+            }
+
+            String varName = target.getText().toLowerCase();
+
+            Object actualValue = value;
+
+            if ("__SPACES__".equals(value)) {
+                Symbol symbol = symbolTable.getSymbol(varName);
+
+                if (symbol != null && symbol.getPicture() != null) {
+
+                    String picture = symbol.getPicture();
+                    int length = 0;
+
+                    for (int k = 0; k < picture.length(); k++) {
+                        char c = picture.charAt(k);
+
+                        if (c == 'X' || c == 'A' || c == '9' || c == 'Z') {
+
+                            if (k + 1 < picture.length() && picture.charAt(k + 1) == '(') {
+
+                                int close = picture.indexOf(')', k + 1);
+
+                                int count = Integer.parseInt(
+                                        picture.substring(k + 2, close));
+
+                                length += count;
+                                k = close;
+
+                            } else {
+                                length++;
+                            }
                         }
-                    } else {
-                        for (int j = 0; j < array.length; j++) {
-                            array[j] = coerceValue(value, array[j]);
-                        }
+                    }
+                    actualValue = " ".repeat(length);
+                } else {
+                    actualValue = "";
+                }
+            } else if ("__HIGH_VALUES__".equals(value)) {
+                actualValue = Character.toString(Character.MAX_VALUE);
+            } else if ("__LOW_VALUES__".equals(value)) {
+                actualValue = Character.toString(Character.MIN_VALUE);
+            }
+
+            if (memory.containsKey(varName) && memory.get(varName) instanceof Object[]) {
+
+                Object[] array = (Object[]) memory.get(varName);
+
+                if (actualValue instanceof Object[]) {
+
+                    Object[] srcArray = (Object[]) actualValue;
+
+                    for (int j = 0; j < Math.min(array.length, srcArray.length); j++) {
+                        array[j] = srcArray[j];
                     }
                 } else {
-                    // coerce value to match the target's type if possible
-                    if (memory.containsKey(varName)) {
-                        value = coerceValue(value, memory.get(varName));
+
+                    for (int j = 0; j < array.length; j++) {
+                        array[j] = coerceValue(actualValue, array[j]);
                     }
-                    memory.put(varName, value);
+                }
+
+            } else {
+                if (memory.containsKey(varName)) {
+                    actualValue = coerceValue(actualValue, memory.get(varName));
+                }
+                memory.put(varName, actualValue);
+            }
+        }
+    }
+
+    private void moveRecord(String sourceRecord, ASTNode moveNode) {
+
+        Symbol source = symbolTable.getSymbol(sourceRecord);
+
+        for (int i = 1; i < moveNode.getChildren().size(); i++) {
+
+            ASTNode targetNode = moveNode.getChildren().get(i);
+
+            if (!targetNode.getType().equals("ToID"))
+                continue;
+
+            Symbol target = symbolTable.getSymbol(targetNode.getText());
+
+            if (target == null || !target.isRecord())
+                continue;
+
+            for (Symbol srcField : symbolTable.getSymbols().values()) {
+
+                if (!source.getName().equalsIgnoreCase(srcField.getParentName()))
+                    continue;
+
+                for (Symbol dstField : symbolTable.getSymbols().values()) {
+
+                    if (!target.getName().equalsIgnoreCase(dstField.getParentName()))
+                        continue;
+
+                    if (srcField.getName().equalsIgnoreCase(dstField.getName())) {
+
+                        Object value = memory.get(srcField.getName().toLowerCase());
+
+                        if (value != null) {
+                            memory.put(dstField.getName().toLowerCase(), value);
+                        }
+                    }
                 }
             }
         }
@@ -597,35 +769,46 @@ public class BabyCobolInterpreter {
     // --- Expression and Value Evaluation ---
 
     private Object evaluateAtomic(ASTNode node) {
-        // recall that BuildASTVisitor creates AST nodes like "AtomicID", "AtomicInt", "AtomicString"
         switch (node.getType()) {
+
             case "AtomicID":
                 String varName = node.getText().toLowerCase();
+
                 if (!memory.containsKey(varName)) {
                     throw new RuntimeException("Variable not initialized: " + varName);
                 }
+
                 Object val = memory.get(varName);
-                // if it's an array (OCCURS), return the first element as representative
-                // for display/expression purposes
+
                 if (val instanceof Object[]) {
                     Object[] arr = (Object[]) val;
-                    if (arr.length > 0) {
-                        return arr[0];
-                    }
-                    return 0.0;
+                    return arr.length > 0 ? arr[0] : 0.0;
                 }
+
                 return val;
+
             case "AtomicInt":
+            case "AtomicDecimal":
                 return Double.parseDouble(node.getText());
+
             case "AtomicString":
-                // remove enclosing quotes
                 String text = node.getText();
-                return text.substring(1, text.length() - 1); 
+                return text.substring(1, text.length() - 1);
+
+            case "AtomicSpaces":
+                return "__SPACES__";
+
+            case "AtomicHighValues":
+                return "__HIGH_VALUES__";
+
+            case "AtomicLowValues":
+                return "__LOW_VALUES__";
+
             default:
-                // handle unwrapped atomic nodes if any
-                if (node.getChildren().size() > 0) {
+                if (!node.getChildren().isEmpty()) {
                     return evaluateAtomic(node.getChildren().get(0));
                 }
+
                 return node.getText();
         }
     }
@@ -667,5 +850,124 @@ public class BabyCobolInterpreter {
         }
         
         return 0.0; // placeholder for deeper mathematical expression recursion
+    }
+
+    private void executeGoTo(ASTNode node) {
+
+        String target = node.getText().toLowerCase();
+
+        if (currentParagraph != null &&
+                alteredTargets.containsKey(currentParagraph)) {
+
+            target = alteredTargets.get(currentParagraph);
+        }
+
+        if (paragraphs.containsKey(target)) {
+            throw new GoToException(target);
+        }
+
+        if (memory.containsKey(target)) {
+
+            Object value = memory.get(target);
+
+            if (!(value instanceof String)) {
+                throw new RuntimeException(
+                        "GO TO field '" + target + "' does not contain a paragraph name");
+            }
+
+            String runtimeTarget = ((String) value).toLowerCase();
+
+            if (!paragraphs.containsKey(runtimeTarget)) {
+                throw new RuntimeException(
+                        "GO TO runtime target does not exist: " + runtimeTarget);
+            }
+
+            throw new GoToException(runtimeTarget);
+        }
+
+        throw new RuntimeException(
+                "Unknown GO TO target or field: " + target);
+    }
+
+    private void executeCall(ASTNode node) {
+        String programName = node.getText();
+
+        try {
+            String source = BabyCobolParserUtils.readResource(
+                    "/examples/" + programName + ".babycob"
+            );
+
+            String processed = BabyCobolParserUtils.preprocess(source);
+
+            ASTUtils.ASTResult result =
+                    ASTUtils.buildASTAndSymbolTable(processed);
+
+            BabyCobolInterpreter child =
+                    new BabyCobolInterpreter(result.symbolTable);
+
+            try {
+                child.execute(result.root);
+            } catch (StopProgramException e) {
+                // Normal termination of the called program.
+                // Return to the caller.
+            }
+
+        } catch (Exception e) {
+            throw new RuntimeException("CALL failed for program: " + programName, e);
+        }
+    }
+
+    private void executeAlter(ASTNode node) {
+
+        String source = node.getChildren().get(0).getText().toLowerCase();
+        String target = node.getChildren().get(1).getText().toLowerCase();
+
+        ASTNode paragraph = paragraphs.get(source);
+
+        if (paragraph == null) {
+            throw new RuntimeException("Unknown paragraph: " + source);
+        }
+
+        if (paragraph.getChildren().size() != 1) {
+            throw new RuntimeException(
+                    "ALTER requires exactly one sentence.");
+        }
+
+        ASTNode sentence = paragraph.getChildren().get(0);
+
+        if (sentence.getChildren().size() != 1) {
+            throw new RuntimeException(
+                    "ALTER requires exactly one statement.");
+        }
+
+        ASTNode stmt = sentence.getChildren().get(0);
+
+        if (!stmt.getType().equals("GoToStmt")) {
+            throw new RuntimeException(
+                    "ALTER only works on paragraphs containing one GO TO.");
+        }
+
+        if (!paragraphs.containsKey(target)) {
+            throw new RuntimeException(
+                    "Unknown ALTER target: " + target);
+        }
+
+        alteredTargets.put(source, target);
+    }
+
+    private void executeSignal(ASTNode node) {
+
+        ASTNode child = node.getChildren().get(0);
+
+        if (child.getType().equals("Off")) {
+            signalHandler = null;
+        } else {
+            if (!paragraphs.containsKey(child.getText().toLowerCase())) {
+                throw new RuntimeException(
+                        "Unknown SIGNAL paragraph: " + child.getText());
+            }
+
+            signalHandler = child.getText().toLowerCase();
+        }
     }
 }
