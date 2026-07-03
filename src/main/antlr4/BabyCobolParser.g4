@@ -267,6 +267,9 @@ atomic
     | INT
     | DECIMAL
     | STRING
+    | SPACES
+    | HIGH_VALUES
+    | LOW_VALUES
     ;
 
 relationalOperator
