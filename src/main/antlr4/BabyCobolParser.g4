@@ -169,7 +169,15 @@ whenSubject
     ;
 
 subWhenSubject
-    : (anyExpression (THROUGH anyExpression)? )+
+    : whenValue (OR whenValue)*
+    ;
+
+whenValue
+    : whenValueExpression (THROUGH whenValueExpression)?
+    ;
+
+whenValueExpression
+    : contractedRelationalExpression (AND contractedRelationalExpression)*
     ;
 
 anyExpression

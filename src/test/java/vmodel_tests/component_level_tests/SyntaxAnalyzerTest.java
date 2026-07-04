@@ -67,6 +67,13 @@ public class SyntaxAnalyzerTest {
     }
 
     @Test
+    void testEvaluateContractedStatements() throws Exception {
+        String code = BabyCobolParserUtils.readResource("/examples/parser_evaluate_contracted.babycob");
+        String tree = BabyCobolParserUtils.parseTree(BabyCobolParserUtils.preprocess(code));
+        assertNotNull(tree);
+    }
+
+    @Test
     void testPerformStatements() throws Exception {
         String code = BabyCobolParserUtils.readResource("/examples/parser_perform_stmt.babycob");
         String tree = BabyCobolParserUtils.parseTree(BabyCobolParserUtils.preprocess(code));

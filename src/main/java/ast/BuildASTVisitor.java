@@ -504,8 +504,33 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
     @Override
     public ASTNode visitSubWhenSubject(BabyCobolParser.SubWhenSubjectContext ctx) {
         ASTNode node = new ASTNode("SubWhenSubject");
-        for (BabyCobolParser.AnyExpressionContext expr : ctx.anyExpression()) {
-            node.addChild(visit(expr));
+        for (BabyCobolParser.WhenValueContext wv : ctx.whenValue()) {
+            node.addChild(visit(wv));
+        }
+        return node;
+    }
+
+    @Override
+    public ASTNode visitWhenValue(BabyCobolParser.WhenValueContext ctx) {
+        ASTNode node = new ASTNode("WhenValue");
+        // first whenValueExpression is always present
+        node.addChild(visit(ctx.whenValueExpression(0)));
+        
+        // second whenValueExpression is for the THROUGH range end
+        if (ctx.whenValueExpression().size() > 1) {
+            node.addChild(visit(ctx.whenValueExpression(1)));
+        }
+        return node;
+    }
+
+    @Override
+    public ASTNode visitWhenValueExpression(BabyCobolParser.WhenValueExpressionContext ctx) {
+        ASTNode node = new ASTNode("WhenValueExpression");
+        node.addChild(visit(ctx.contractedRelationalExpression(0)));
+        for (int i = 1; i < ctx.contractedRelationalExpression().size(); i++) {
+            ASTNode andNode = new ASTNode("LogicalOp", "AND");
+            node.addChild(andNode);
+            node.addChild(visit(ctx.contractedRelationalExpression(i)));
         }
         return node;
     }
