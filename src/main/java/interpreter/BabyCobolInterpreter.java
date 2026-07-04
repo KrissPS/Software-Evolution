@@ -225,10 +225,10 @@ public class BabyCobolInterpreter {
                 executeLoop(statement);
                 break;
             case "EvaluateStmt":
-                executeEvaluate(statement); // not complete
+                executeEvaluate(statement);
                 break;
             case "PerformStmt":
-                executePerform(statement); // maybe complete?
+                executePerform(statement);
                 break;
             case "NextSentenceStmt":
                 throw new NextSentenceException();
