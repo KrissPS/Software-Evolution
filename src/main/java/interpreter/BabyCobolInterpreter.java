@@ -48,7 +48,7 @@ public class BabyCobolInterpreter {
      * OCCURS arrays are initialized as Object[] of the appropriate size
      */
     private void initializeMemory() {
-        for (Symbol symbol : symbolTable.getSymbols().values()) {
+        for (Symbol symbol : symbolTable.getAllSymbols()) {
             String pic = symbol.getPicture();
 
             if (pic != null && !pic.isEmpty()) {
@@ -225,10 +225,10 @@ public class BabyCobolInterpreter {
                 executeLoop(statement);
                 break;
             case "EvaluateStmt":
-                executeEvaluate(statement); // not complete
+                executeEvaluate(statement);
                 break;
             case "PerformStmt":
-                executePerform(statement); // maybe complete?
+                executePerform(statement);
                 break;
             case "NextSentenceStmt":
                 throw new NextSentenceException();
@@ -407,12 +407,12 @@ public class BabyCobolInterpreter {
             if (target == null || !target.isRecord())
                 continue;
 
-            for (Symbol srcField : symbolTable.getSymbols().values()) {
+            for (Symbol srcField : symbolTable.getAllSymbols()) {
 
                 if (!source.getName().equalsIgnoreCase(srcField.getParentName()))
                     continue;
 
-                for (Symbol dstField : symbolTable.getSymbols().values()) {
+                for (Symbol dstField : symbolTable.getAllSymbols()) {
 
                     if (!target.getName().equalsIgnoreCase(dstField.getParentName()))
                         continue;
@@ -593,15 +593,6 @@ public class BabyCobolInterpreter {
     }
 
     private void executeEvaluate(ASTNode node) {
-        /*
-        TODO:
-        Statements of with shortened form like so still cant run
-        EVALUATE X
-            WHEN 10 OR 20
-                DISPLAY "EVALUATE CONTRACTED VALUES"
-
-        */
-        
         java.util.List<Object> evaluateSubjects = new java.util.ArrayList<>();
         
         // 1) gather the main EVALUATE subject
@@ -643,22 +634,16 @@ public class BabyCobolInterpreter {
                         
                         boolean subMatch = false;
                         
-                        // special handling if the subject is "TRUE" (Condition mode)
+                        // special handling if the subject is "TRUE" (so the condition mode)
                         if (subjectValue instanceof Boolean && (Boolean) subjectValue) {
                             subMatch = evaluateCondition(subWhenNode);
                         } else {
-                            // value comparison (exact match or THROUGH range)
-                            if (subWhenNode.getChildren().size() == 1) {
-                                Object whenVal = evaluateGenericExpression(subWhenNode.getChildren().get(0));
-                                if (compareValues(subjectValue, whenVal) == 0) {
+                            // SubWhenSubject contains WhenValue children separated by OR
+                            // matches if ANY WhenValue matches
+                            for (ASTNode whenValueNode : subWhenNode.getChildren()) {
+                                if (matchWhenValue(subjectValue, whenValueNode)) {
                                     subMatch = true;
-                                }
-                            } else if (subWhenNode.getChildren().size() == 2) { // THROUGH range
-                                Object rangeStart = evaluateGenericExpression(subWhenNode.getChildren().get(0));
-                                Object rangeEnd = evaluateGenericExpression(subWhenNode.getChildren().get(1));
-                                
-                                if (compareValues(subjectValue, rangeStart) >= 0 && compareValues(subjectValue, rangeEnd) <= 0) {
-                                    subMatch = true;
+                                    break;
                                 }
                             }
                         }
@@ -680,6 +665,31 @@ public class BabyCobolInterpreter {
                 }
             }
         }
+    }
+
+    /**
+     * checks whether a single WhenValue matches the given subject value,
+     * A WhenValue has 1 WhenValueExpression child (exact match) or 2 (the range for THROUGH)
+     * each of WhenValueExpression wraps the actual value/expression
+     */
+    private boolean matchWhenValue(Object subjectValue, ASTNode whenValueNode) {
+        java.util.List<ASTNode> children = whenValueNode.getChildren();
+        
+        if (children.size() == 1) {
+            // exact value match, so extract single value from WhenValueExpression
+            ASTNode wve = children.get(0);
+            Object whenVal = resolveAtomicValue(wve.getChildren().get(0));
+            return compareValues(subjectValue, whenVal) == 0;
+        } else if (children.size() == 2) {
+            // THROUGH range, so extract values from both WhenValueExpressions
+            ASTNode wveStart = children.get(0);
+            ASTNode wveEnd = children.get(1);
+            Object rangeStart = resolveAtomicValue(wveStart.getChildren().get(0));
+            Object rangeEnd = resolveAtomicValue(wveEnd.getChildren().get(0));
+            return compareValues(subjectValue, rangeStart) >= 0 && compareValues(subjectValue, rangeEnd) <= 0;
+        }
+        
+        return false;
     }
 
     private void executePerform(ASTNode node) {
@@ -814,29 +824,113 @@ public class BabyCobolInterpreter {
     }
 
     private boolean evaluateCondition(ASTNode conditionNode) {
-        // for a simple RelationalExpression evaluation:
-        if (conditionNode.getType().equals("RelationalExpression")) {
-            double left = evaluateMathExpression(conditionNode.getChildren().get(0));
-            String op = conditionNode.getChildren().get(1).getText(); // RelationalOp
-            double right = evaluateMathExpression(conditionNode.getChildren().get(2));
-
-            switch (op) {
-                case "=": return left == right;
-                case "<": return left < right;
-                case ">": return left > right;
-                case "<=": return left <= right;
-                case ">=": return left >= right;
-                case "<>": return left != right;
-                default: throw new RuntimeException("Unknown relational operator: " + op);
+        // this is to handle NOT unary expression
+        if (conditionNode.getType().equals("UnaryExpression")) {
+            java.util.List<ASTNode> children = conditionNode.getChildren();
+            // check for NOT operator
+            if (children.size() >= 2 && 
+                children.get(0).getType().equals("UnaryOp") && 
+                "NOT".equalsIgnoreCase(children.get(0).getText())
+            ) {
+                return !evaluateCondition(children.get(1));
             }
         }
 
-        // Drill down to the actual relational or boolean node
+        // this is to handle ContractedRelationalExpression
+        if (conditionNode.getType().equals("ContractedRelationalExpression")) {
+            java.util.List<ASTNode> children = conditionNode.getChildren();
+            if (children.size() == 1) {
+                return evaluateCondition(children.get(0));
+            }
+            if (children.size() == 2 
+                && children.get(0).getType().equals("RelationalOperator")) {
+                // the contracted form "> value" is not meaningful without a left operand
+                return false;
+            }
+        }
+
+        // handle SubWhenSubject when TRUE
+        // SubWhenSubject has WhenValue children separated by OR
+        if (conditionNode.getType().equals("SubWhenSubject")) {
+            for (ASTNode whenValueNode : conditionNode.getChildren()) {
+                if (evaluateWhenValue(whenValueNode)) {
+                    return true; // it is OR, so the first match wins
+                }
+            }
+            return false;
+        }
+
+        // handle when WhenValue delegates to its WhenValueExpression
+        if (conditionNode.getType().equals("WhenValue")) {
+            return evaluateWhenValue(conditionNode);
+        }
+
+        // handle WhenValueExpression, AND between children
+        if (conditionNode.getType().equals("WhenValueExpression")) {
+            java.util.List<ASTNode> children = conditionNode.getChildren();
+
+            boolean result = evaluateCondition(children.get(0));
+            for (int i = 1; i + 1 < children.size(); i += 2) {
+                // children.get(i) is LogicalOp("AND")
+                result = result && evaluateCondition(children.get(i + 1));
+            }
+            return result;
+        }
+
+        // handle LogicalExpression with AND/OR
+        if (conditionNode.getType().equals("LogicalExpression")) {
+            java.util.List<ASTNode> children = conditionNode.getChildren();
+            boolean result = evaluateCondition(children.get(0));
+            for (int i = 1; i + 1 < children.size(); i += 2) {
+                String op = children.get(i).getText();
+                boolean next = evaluateCondition(children.get(i + 1));
+                if ("AND".equalsIgnoreCase(op)) {
+                    result = result && next;
+                } else if ("OR".equalsIgnoreCase(op)) {
+                    result = result || next;
+                }
+            }
+            return result;
+        }
+
+        // for a simple RelationalExpression evaluation:
+        if (conditionNode.getType().equals("RelationalExpression")) {
+            java.util.List<ASTNode> children = conditionNode.getChildren();
+            if (children.size() >= 3) {
+                double left = evaluateMathExpression(children.get(0));
+                String op = children.get(1).getText();
+                double right = evaluateMathExpression(children.get(2));
+                switch (op) {
+                    case "=": return left == right;
+                    case "<": return left < right;
+                    case ">": return left > right;
+                    case "<=": return left <= right;
+                    case ">=": return left >= right;
+                    case "<>": return left != right;
+                    default: throw new RuntimeException("Unknown relational operator: " + op);
+                }
+            }
+        }
+
+        // drill down to the actual relational or boolean node
         if (!conditionNode.getChildren().isEmpty()) {
             return evaluateCondition(conditionNode.getChildren().get(0));
         }
 
         return false; 
+    }
+
+    /**
+     * evaluate a WhenValue node when TRUE
+     * each WhenValue has a WhenValueExpression wrapping the condition/s
+     */
+    private boolean evaluateWhenValue(ASTNode whenValueNode) {
+        for (ASTNode wve : whenValueNode.getChildren()) {
+            if (evaluateCondition(wve)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private double evaluateMathExpression(ASTNode exprNode) {

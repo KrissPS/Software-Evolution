@@ -6,6 +6,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import preprocessing.BabyCobolParserUtils;
+import preprocessing.StopProgramException;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
@@ -48,7 +49,11 @@ public class InterpreterIntegrationTest {
         BabyCobolInterpreter interpreter = createInterpreter(filename);
         String source = Files.readString(Paths.get(RESOURCE_PATH + filename));
         ASTUtils.ASTResult ast = ASTUtils.buildASTAndSymbolTable(BabyCobolParserUtils.preprocess(source));
-        interpreter.execute(ast.root);
+        try {
+            interpreter.execute(ast.root);
+        } catch (StopProgramException e) {
+            // normal program termination via STOP
+        }
         return interpreter;
     }
 
@@ -135,6 +140,34 @@ public class InterpreterIntegrationTest {
         assertTrue(stdout.contains("X IN 10-20 RANGE"));
         assertTrue(stdout.contains("BOTH MATCH"));
         assertTrue(stdout.contains("X IS GREATER THAN 10"));
+    }
+
+    @Test
+    public void testEvaluateContractedStatement() throws Exception {
+        Map<String, Object> memory = runProgram("evaluate_contracted.babycob").getMemory();
+
+        String stdout = outContent.toString();
+        // check all branches are visited and COUNTER reaches 8
+        assertTrue(stdout.contains("MATCHED OR VALUES"),
+                "Should match 10 in WHEN 10 OR 20 OR 30");
+        assertTrue(stdout.contains("OTHER CAUGHT"),
+                "X=25 should fall through to OTHER");
+        assertTrue(stdout.contains("MATCHED THROUGH RANGE OR"),
+                "X=15 should match WHEN 10 THROUGH 20 OR 30 THROUGH 40");
+        assertTrue(stdout.contains("RANGE OTHER CAUGHT"),
+                "X=45 should not match any THROUGH range");
+        assertTrue(stdout.contains("ALSO MATCH"),
+                "X=5 ALSO Y=25 should match WHEN 5 ALSO 25");
+        assertTrue(stdout.contains("TRUE CONDITION MATCH"),
+                "TRUE mode with X > 10 AND X < 20 should match when x=12");
+        assertTrue(stdout.contains("TRUE OR OTHER"),
+                "TRUE mode with X < 5 OR X > 10 should not match when x=8");
+        assertTrue(stdout.contains("TRUE OR MATCH"),
+                "TRUE mode with X < 5 OR X > 10 should match when x=3");
+
+        // COUNTER should be 8, which is one increment per matching branch
+        Double counter = (Double) memory.get("counter");
+        assertEquals(8.0, counter, 0.001, "COUNTER should be 8 after all evaluate branches");
     }
 
     @Test

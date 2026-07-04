@@ -5,7 +5,7 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 import parser.BabyCobolParserBaseVisitor;
 import parser.BabyCobolParser;
 
-import java.util.Stack;
+import java.util.*;
 
 public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
 
@@ -103,7 +103,7 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
                     occurs = Integer.parseInt(clause.occursClause().INT().getText());
                 }
             } else if (clause.likeClause() != null) {
-                like = clause.likeClause().ID().getText();
+                like = qualifiedNameText(clause.likeClause().qualifiedName());
                 if (clause.occursClause() != null) {
                     occurs = Integer.parseInt(clause.occursClause().INT().getText());
                 }
@@ -113,7 +113,7 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
         }
 
         // Determine parent from recordStack based on level hierarchy
-        String parentName = null;
+        Symbol parentSymbol = null;
 
         // Pop entries from the stack whose level is >= the current level
         // (sibling or above - we need the nearest level strictly less than current)
@@ -121,18 +121,19 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
             recordStack.pop();
         }
         if (!recordStack.isEmpty()) {
-            parentName = recordStack.peek().getName();
+            parentSymbol = recordStack.peek();
         }
 
-        // LIKE resolution: copy the referenced symbol's picture (or entire record structure)
-        // LIKE inherits the basic type (picture) of the referenced field, not the occurring dimension
+        // LIKE resolution: resolve sufficiently qualified name to a unique symbol
+        Symbol likeResolved = null;
         if (!like.isEmpty()) {
-            Symbol referenced = symbolTable.getSymbol(like);
-            if (referenced == null) {
+            likeResolved = resolveQualifiedName(like, "LIKE clause in entry '" + id + "'");
+            if (likeResolved == null) {
                 throw new IllegalArgumentException(
-                    "LIKE references unknown symbol '" + like + "' in entry '" + id + "'");
+                    "Unknown symbol '" + like + "' in LIKE clause in entry '" + id + "'" +
+                    " (LIKE references unknown symbol '" + like + "')");
             }
-            picture = referenced.getPicture();
+            picture = likeResolved.getPicture();
             // if the referenced symbol has no picture (it's a record), copy its children
             if (picture == null || picture.isEmpty()) {
                 // LIKE a record: copy its entire substructure
@@ -143,19 +144,28 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
             // do not copy referenced.getOccurs() so LIKE resolves the base type only
         }
 
-        // Create the symbol with parent name
-        Symbol symbol = new Symbol(id, level, picture, like, occurs, parentName);
+        // Create the symbol with parent reference
+        Symbol symbol = new Symbol(id, level, picture, like, occurs,
+            parentSymbol != null ? parentSymbol.getName() : null,
+            parentSymbol);
         symbolTable.addSymbol(symbol);
 
         // If this is a record (no PICTURE, no LIKE that resolves to a field), push onto stack
+        boolean isRecord = false;
         if (picture.isEmpty() && like.isEmpty()) {
+            isRecord = true;
+        } else if (likeResolved != null && (likeResolved.getPicture() == null || likeResolved.getPicture().isEmpty())) {
+            // LIKE copied a record so this is also a record
+            isRecord = true;
+        }
+
+        if (isRecord) {
             recordStack.push(symbol);
-        } else if (!like.isEmpty()) {
-            Symbol referenced = symbolTable.getSymbol(like);
-            if (referenced != null && (referenced.getPicture() == null || referenced.getPicture().isEmpty())) {
-                // LIKE copied a record, so this is also a record
-                recordStack.push(symbol);
-            }
+        }
+
+        // if LIKE references a record, recursively copy its descendant structure
+        if (likeResolved != null && (likeResolved.getPicture() == null || likeResolved.getPicture().isEmpty())) {
+            copyRecordStructure(likeResolved, symbol, level);
         }
 
         return node;
@@ -242,7 +252,7 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
     @Override
     public ASTNode visitLikeClause(BabyCobolParser.LikeClauseContext ctx) {
         ASTNode node = new ASTNode("LikeClause");
-        node.addChild(new ASTNode("ID", ctx.ID().getText()));
+        node.addChild(new ASTNode("ID", qualifiedNameText(ctx.qualifiedName())));
         return node;
     }
 
@@ -308,8 +318,10 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
     @Override
     public ASTNode visitAcceptStmt(BabyCobolParser.AcceptStmtContext ctx) {
         ASTNode node = new ASTNode("AcceptStmt");
-        for (TerminalNode id : ctx.ID()) {
-            node.addChild(new ASTNode("ID", id.getText()));
+        for (BabyCobolParser.QualifiedNameContext qn : ctx.qualifiedName()) {
+            String qnText = qualifiedNameText(qn);
+            String resolvedName = resolveAndGetSimpleName(qnText, "ACCEPT statement");
+            node.addChild(new ASTNode("ID", resolvedName));
         }
         return node;
     }
@@ -350,7 +362,7 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
             if (ctx.atomic().size() > 2) {
                 throw new IllegalArgumentException("If the third argument is present, there can be only one second argument.");
             }
-            if (ctx.givingRemainderClause().remainderClause() != null && ctx.givingRemainderClause().ID().size() > 1) {
+            if (ctx.givingRemainderClause().remainderClause() != null && ctx.givingRemainderClause().qualifiedName().size() > 1) {
                 throw new IllegalArgumentException("If the fourth argument is present, there can be only one third argument.");
             }
             node.addChild(visit(ctx.givingRemainderClause()));
@@ -406,8 +418,10 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
     public ASTNode visitMoveStmt(BabyCobolParser.MoveStmtContext ctx) {
         ASTNode node = new ASTNode("MoveStmt");
         node.addChild(visit(ctx.atomic()));
-        for (TerminalNode id : ctx.ID()) {
-            node.addChild(new ASTNode("ToID", id.getText()));
+        for (BabyCobolParser.QualifiedNameContext qn : ctx.qualifiedName()) {
+            String qnText = qualifiedNameText(qn);
+            String resolvedName = resolveAndGetSimpleName(qnText, "MOVE statement");
+            node.addChild(new ASTNode("ToID", resolvedName));
         }
         return node;
     }
@@ -490,8 +504,33 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
     @Override
     public ASTNode visitSubWhenSubject(BabyCobolParser.SubWhenSubjectContext ctx) {
         ASTNode node = new ASTNode("SubWhenSubject");
-        for (BabyCobolParser.AnyExpressionContext expr : ctx.anyExpression()) {
-            node.addChild(visit(expr));
+        for (BabyCobolParser.WhenValueContext wv : ctx.whenValue()) {
+            node.addChild(visit(wv));
+        }
+        return node;
+    }
+
+    @Override
+    public ASTNode visitWhenValue(BabyCobolParser.WhenValueContext ctx) {
+        ASTNode node = new ASTNode("WhenValue");
+        // first whenValueExpression is always present
+        node.addChild(visit(ctx.whenValueExpression(0)));
+        
+        // second whenValueExpression is for the THROUGH range end
+        if (ctx.whenValueExpression().size() > 1) {
+            node.addChild(visit(ctx.whenValueExpression(1)));
+        }
+        return node;
+    }
+
+    @Override
+    public ASTNode visitWhenValueExpression(BabyCobolParser.WhenValueExpressionContext ctx) {
+        ASTNode node = new ASTNode("WhenValueExpression");
+        node.addChild(visit(ctx.contractedRelationalExpression(0)));
+        for (int i = 1; i < ctx.contractedRelationalExpression().size(); i++) {
+            ASTNode andNode = new ASTNode("LogicalOp", "AND");
+            node.addChild(andNode);
+            node.addChild(visit(ctx.contractedRelationalExpression(i)));
         }
         return node;
     }
@@ -619,8 +658,10 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
     @Override
     public ASTNode visitGivingClause(BabyCobolParser.GivingClauseContext ctx) {
         ASTNode node = new ASTNode("GivingClause");
-        for (TerminalNode id : ctx.ID()) {
-            node.addChild(new ASTNode("ID", id.getText()));
+        for (BabyCobolParser.QualifiedNameContext qn : ctx.qualifiedName()) {
+            String qnText = qualifiedNameText(qn);
+            String resolvedName = resolveAndGetSimpleName(qnText, "GIVING clause");
+            node.addChild(new ASTNode("ID", resolvedName));
         }
         return node;
     }
@@ -628,8 +669,10 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
     @Override
     public ASTNode visitGivingRemainderClause(BabyCobolParser.GivingRemainderClauseContext ctx) {
         ASTNode node = new ASTNode("GivingRemainderClause");
-        for (TerminalNode id : ctx.ID()) {
-            node.addChild(new ASTNode("ID", id.getText()));
+        for (BabyCobolParser.QualifiedNameContext qn : ctx.qualifiedName()) {
+            String qnText = qualifiedNameText(qn);
+            String resolvedName = resolveAndGetSimpleName(qnText, "GIVING clause");
+            node.addChild(new ASTNode("ID", resolvedName));
         }
         if (ctx.remainderClause() != null) {
             node.addChild(visit(ctx.remainderClause()));
@@ -639,7 +682,9 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
 
     @Override
     public ASTNode visitRemainderClause(BabyCobolParser.RemainderClauseContext ctx) {
-        return new ASTNode("RemainderClause", ctx.ID().getText());
+        String qnText = qualifiedNameText(ctx.qualifiedName());
+        String resolvedName = resolveAndGetSimpleName(qnText, "REMAINDER clause");
+        return new ASTNode("RemainderClause", resolvedName);
     }
 
     @Override
@@ -662,7 +707,9 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
     @Override
     public ASTNode visitVaryingClause(BabyCobolParser.VaryingClauseContext ctx) {
         ASTNode node = new ASTNode("VaryingClause");
-        node.addChild(new ASTNode("ID", ctx.ID().getText()));
+        String qnText = qualifiedNameText(ctx.qualifiedName());
+        String resolvedName = resolveAndGetSimpleName(qnText, "VARYING clause");
+        node.addChild(new ASTNode("ID", resolvedName));
         
         // track position in atomic() since some clauses can be omitted
         int atomicIndex = 0;
@@ -704,9 +751,10 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
 
     @Override
     public ASTNode visitAtomic(BabyCobolParser.AtomicContext ctx) {
-        if (ctx.ID() != null) {
-            return new ASTNode("AtomicID", ctx.ID().getText());
-
+        if (ctx.qualifiedName() != null) {
+            String qnText = qualifiedNameText(ctx.qualifiedName());
+            String resolvedName = resolveAndGetSimpleName(qnText, "expression");
+            return new ASTNode("AtomicID", resolvedName);
         } else if (ctx.INT() != null) {
             return new ASTNode("AtomicInt", ctx.INT().getText());
 
@@ -733,68 +781,154 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
         return new ASTNode("RelationalOperator", ctx.getText());
     }
 
-    @Override
-    public ASTNode visitGoToStmt(BabyCobolParser.GoToStmtContext ctx) {
-        return new ASTNode("GoToStmt", ctx.ID().getText());
+    // --------
+    // sufficient qualification resolving stuff
+
+    /**
+     * returns the textual representation of a qualified name as written
+     * in the source, with segments joined by " OF "
+     */
+    private String qualifiedNameText(BabyCobolParser.QualifiedNameContext ctx) {
+        StringBuilder sb = new StringBuilder();
+        for (TerminalNode id : ctx.ID()) {
+            if (sb.length() > 0) {
+                sb.append(" OF ");
+            }
+            sb.append(id.getText());
+        }
+        return sb.toString();
     }
 
-    @Override
-    public ASTNode visitCallStmt(BabyCobolParser.CallStmtContext ctx) {
-        ASTNode node = new ASTNode("CallStmt", ctx.ID().getText());
+    /**
+     * splits a textual qualified name into its segments
+     */
+    private List<String> splitQualifiedName(String qualifiedName) {
+        List<String> parts = new ArrayList<>();
+        for (String part : qualifiedName.split("(?i)\\s+OF\\s+")) {
+            parts.add(part.trim());
+        }
+        return parts;
+    }
 
-        if (ctx.usingCallClause() != null) {
-            node.addChild(visit(ctx.usingCallClause()));
+    /**
+     * resolves a qualified or unqualified name to a unique symbol,
+     * then returns just the simple (last segment) name.
+     * Throws error if ambiguous or insufficient qualification
+     */
+    private String resolveAndGetSimpleName(String qualifiedName, String contextDescription) {
+        Symbol resolved = resolveQualifiedName(qualifiedName, contextDescription);
+        if (resolved != null) {
+            return resolved.getName();
+        }
+        // Symbol not in the table (no DATA DIVISION or special identifier like TRUE):
+        // return just the simple (first) name part
+        List<String> parts = splitQualifiedName(qualifiedName);
+        return parts.isEmpty() ? qualifiedName : parts.get(0);
+    }
+
+    /**
+     * resolves a qualified or unqualified name to a unique symbol
+     * the last segment is the target field name, preceding segments are
+     * higher level qualifiers that must appear on a path from the target
+     * towards the root. ambiguous references make a compilation error
+     */
+    private Symbol resolveQualifiedName(String qualifiedName, String contextDescription) {
+        List<String> parts = splitQualifiedName(qualifiedName);
+        if (parts.isEmpty()) {
+            throw new IllegalArgumentException("Empty qualified name in " + contextDescription);
         }
 
-        return node;
-    }
+        String targetName = parts.get(0);
+        List<String> requiredQualifiers = parts.subList(1, parts.size());
 
-    @Override
-    public ASTNode visitUsingCallClause(BabyCobolParser.UsingCallClauseContext ctx) {
-        ASTNode node = new ASTNode("UsingCallClause");
+        // collect all symbols with the target name
+        List<Symbol> candidates = symbolTable.getSymbolsByName(targetName);
 
-        for (BabyCobolParser.CallArgumentContext arg : ctx.callArgument()) {
-            node.addChild(visit(arg));
+        // if no symbols with this name exist just return the simple name as is.
+        // this handles cases where the data division is empty or the symbol is
+        // a special identifier (e.g. TRUE) not defined in the symbol table
+        if (candidates.isEmpty()) {
+            return null;
         }
 
-        return node;
-    }
-
-    @Override
-    public ASTNode visitCallArgument(BabyCobolParser.CallArgumentContext ctx) {
-        if (ctx.REFERENCE() != null) {
-            return new ASTNode("ByReference", ctx.ID().getText());
+        // filter by required qualifiers ie must appear on the ancestor chain
+        List<Symbol> matches = new ArrayList<>();
+        for (Symbol candidate : candidates) {
+            if (hasQualifiers(candidate, requiredQualifiers)) {
+                matches.add(candidate);
+            }
         }
 
-        ASTNode node = new ASTNode(
-                ctx.CONTENT() != null ? "ByContent" : "ByValue"
-        );
-        node.addChild(visit(ctx.atomic()));
-        return node;
-    }
-
-    @Override
-    public ASTNode visitAlterStmt(BabyCobolParser.AlterStmtContext ctx) {
-
-        ASTNode node = new ASTNode("AlterStmt");
-
-        node.addChild(new ASTNode("Source", ctx.ID(0).getText()));
-        node.addChild(new ASTNode("Target", ctx.ID(1).getText()));
-
-        return node;
-    }
-
-    @Override
-    public ASTNode visitSignalStmt(BabyCobolParser.SignalStmtContext ctx) {
-
-        ASTNode node = new ASTNode("SignalStmt");
-
-        if (ctx.ID() != null) {
-            node.addChild(new ASTNode("Target", ctx.ID().getText()));
-        } else {
-            node.addChild(new ASTNode("Off"));
+        if (matches.isEmpty()) {
+            throw new IllegalArgumentException(
+                "Insufficient qualification for '" + qualifiedName + "' in " + contextDescription);
+        }
+        if (matches.size() > 1) {
+            throw new IllegalArgumentException(
+                "Ambiguous reference '" + qualifiedName + "' in " + contextDescription);
         }
 
-        return node;
+        return matches.get(0);
+    }
+
+    /**
+     * checks whether the given symbol's ancestor chain (traversed via parent reference)
+     * contains every required qualifier. the qualifier list is written from target to root
+     * (e.g. for "D OF C OF B", qualifiers are [C, B]).
+     * We walk up the parent chain and verify each required qualifier appears in sequence from the target upward
+     */
+    private boolean hasQualifiers(Symbol symbol, List<String> requiredQualifiers) {
+        if (requiredQualifiers.isEmpty()) {
+            return true;
+        }
+
+        Symbol current = symbol;
+        // qualifiers are listed from innermost to outermost: [C, B, A] for "D OF C OF B OF A"
+        // We need to match them in order as we walk up the parent chain
+        int qualifierIndex = 0;
+
+        while (current.getParent() != null && qualifierIndex < requiredQualifiers.size()) {
+            Symbol parent = current.getParent();
+            if (parent.getName().equalsIgnoreCase(requiredQualifiers.get(qualifierIndex))) {
+                qualifierIndex++;
+            }
+            current = parent;
+        }
+
+        return qualifierIndex >= requiredQualifiers.size();
+    }
+
+    /**
+     * NOT CONFIDENT IN THE FOLLOWING, NEED MORE TINKERING AND TESTING **
+     * recursively copies all descendant symbols from a source record to a target
+     * new parent symbol. each descendant gets cloned with the new parent reference,
+     * preserving names, levels, picture values, and occurs counts.
+     * The level offset is the difference between the new parent's level and the source parent's level.
+     */
+    private void copyRecordStructure(Symbol sourceRecord, Symbol newParent, int newParentLevel) {
+        int levelOffset = newParentLevel - sourceRecord.getLevel();
+
+        // find all symbols whose parent is the source record, ordered by their occurrence
+        // We need to process them in order - get all symbols and filter
+        for (Symbol candidate : symbolTable.getAllSymbols()) {
+            if (candidate.getParent() == sourceRecord) {
+                int newLevel = candidate.getLevel() + levelOffset;
+                String pic = candidate.getPicture();
+                String like = candidate.getLike();
+                int occurs = candidate.getOccurs();
+
+                Symbol cloned = new Symbol(candidate.getName(), newLevel, pic, like, occurs,
+                    newParent.getName(), newParent);
+                symbolTable.addSymbol(cloned);
+
+                // if this clone is a record (no picture) recursively copy its children too
+                if ((pic == null || pic.isEmpty()) && (like == null || like.isEmpty())) {
+                    copyRecordStructure(candidate, cloned, newLevel);
+                } else if (like != null && !like.isEmpty() && (pic == null || pic.isEmpty())) {
+                    // LIKE of a record
+                    copyRecordStructure(candidate, cloned, newLevel);
+                }
+            }
+        }
     }
 }

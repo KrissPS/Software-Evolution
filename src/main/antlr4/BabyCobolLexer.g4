@@ -60,6 +60,7 @@ LOW_VALUES : 'LOW-VALUES';
 PICTURE : 'PICTURE';
 IS      : 'IS';
 LIKE    : 'LIKE';
+OF      : 'OF';
 OCCURS  : 'OCCURS';
 TIMES   : 'TIMES';
 

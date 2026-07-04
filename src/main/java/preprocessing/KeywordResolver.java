@@ -22,7 +22,7 @@ public class KeywordResolver {
             "ACCEPT", "ADD", "MULTIPLY", "BY", "TO", "GIVING", "DIVIDE", "INTO",
             "REMAINDER", "EVALUATE", "ALSO", "END", "WHEN", "OTHER", "THROUGH",
             "IF", "THEN", "ELSE", "AND", "OR", "NOT", "SUBTRACT", "FROM",
-            "MOVE", "PERFORM", "STOP", "PICTURE", "IS", "LIKE", "OCCURS", "TIMES",
+            "MOVE", "PERFORM", "STOP", "PICTURE", "IS", "LIKE", "OF", "OCCURS", "TIMES",
             "DISPLAY", "WITH", "NO", "ADVANCING"));
 
     public static String resolve(String code) throws AmbiguityException {
