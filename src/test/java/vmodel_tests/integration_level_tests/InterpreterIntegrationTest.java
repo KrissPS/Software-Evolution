@@ -232,4 +232,36 @@ public class InterpreterIntegrationTest {
         assertTrue(exception.getMessage().contains("CALL-ECHO-TWO-ARGS"),
                 "USING count mismatch should mention target program, got: " + exception.getMessage());
     }
+
+    @Test
+    public void testCallUsingArgumentToCalleeWithoutUsingThrowsRuntimeError() {
+        RuntimeException exception = assertThrows(RuntimeException.class, () ->
+                runProgram("call_main_using_to_no_using_callee.babycob")
+        );
+
+        assertTrue(exception.getMessage().contains("CALL"),
+                "USING-to-no-USING mismatch should mention CALL, got: " + exception.getMessage());
+        assertTrue(exception.getMessage().contains("USING"),
+                "USING-to-no-USING mismatch should mention USING, got: " + exception.getMessage());
+        assertTrue(exception.getMessage().contains("CALL-HELLO-NO-ARGS"),
+                "USING-to-no-USING mismatch should mention target program, got: " + exception.getMessage());
+        assertTrue(exception.getMessage().contains("expects 0"),
+                "USING-to-no-USING mismatch should mention expected count, got: " + exception.getMessage());
+    }
+
+    @Test
+    public void testCallWithoutArgumentsToUsingCalleeThrowsRuntimeError() {
+        RuntimeException exception = assertThrows(RuntimeException.class, () ->
+                runProgram("call_main_no_args_to_using_callee.babycob")
+        );
+
+        assertTrue(exception.getMessage().contains("CALL"),
+                "No-args-to-USING mismatch should mention CALL, got: " + exception.getMessage());
+        assertTrue(exception.getMessage().contains("USING"),
+                "No-args-to-USING mismatch should mention USING, got: " + exception.getMessage());
+        assertTrue(exception.getMessage().contains("CALL-ECHO-ONE-ARG"),
+                "No-args-to-USING mismatch should mention target program, got: " + exception.getMessage());
+        assertTrue(exception.getMessage().contains("caller provided 0"),
+                "No-args-to-USING mismatch should mention provided count, got: " + exception.getMessage());
+    }
 }
