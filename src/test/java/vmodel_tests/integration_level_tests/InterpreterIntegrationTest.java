@@ -127,7 +127,7 @@ public class InterpreterIntegrationTest {
         assertEquals(22.0, (Double) memory.get("y"));
         assertEquals(0.0, (Double) memory.get("counter"));
     }
-
+////////////
     @Test
     public void testEvaluateStatement() throws Exception {
         runProgram("evaluate_statement.babycob");
@@ -154,5 +154,44 @@ public class InterpreterIntegrationTest {
         String stdout = outContent.toString();
         assertTrue(stdout.contains("BEFORE STOP"));
         assertFalse(stdout.contains("AFTER STOP"));
+    }
+
+    @Test
+    public void testCallNoArgumentsExecutesCalledProgramAndReturns() throws Exception {
+        runProgram("call_main_no_args.babycob");
+
+        String stdout = outContent.toString();
+
+        assertTrue(stdout.contains("MAIN BEFORE"));
+        assertTrue(stdout.contains("HELLO FROM CALL"));
+        assertTrue(stdout.contains("MAIN AFTER"));
+        assertTrue(stdout.indexOf("MAIN BEFORE") < stdout.indexOf("HELLO FROM CALL"));
+        assertTrue(stdout.indexOf("HELLO FROM CALL") < stdout.indexOf("MAIN AFTER"));
+    }
+
+    @Test
+    public void testCallMissingProgramThrowsRuntimeError() {
+        RuntimeException exception = assertThrows(RuntimeException.class, () ->
+                runProgram("call_missing_program.babycob")
+        );
+
+        assertTrue(exception.getMessage().contains("CALL"),
+                "Missing program error should mention CALL, got: " + exception.getMessage());
+        assertTrue(exception.getMessage().contains("DOES-NOT-EXIST"),
+                "Missing program error should mention target program, got: " + exception.getMessage());
+    }
+
+    @Test
+    public void testCallStopInCalledProgramReturnsToCaller() throws Exception {
+        runProgram("call_main_stop_returns.babycob");
+
+        String stdout = outContent.toString();
+
+        assertTrue(stdout.contains("MAIN BEFORE STOP CALL"));
+        assertTrue(stdout.contains("CALLEE BEFORE STOP"));
+        assertFalse(stdout.contains("CALLEE AFTER STOP"));
+        assertTrue(stdout.contains("MAIN AFTER STOP CALL"));
+        assertTrue(stdout.indexOf("MAIN BEFORE STOP CALL") < stdout.indexOf("CALLEE BEFORE STOP"));
+        assertTrue(stdout.indexOf("CALLEE BEFORE STOP") < stdout.indexOf("MAIN AFTER STOP CALL"));
     }
 }
