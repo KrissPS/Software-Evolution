@@ -627,6 +627,11 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
     }
 
     @Override
+    public ASTNode visitGoToStmt(BabyCobolParser.GoToStmtContext ctx) {
+        return new ASTNode("GoToStmt", ctx.ID().getText());
+    }
+
+    @Override
     public ASTNode visitCallStmt(BabyCobolParser.CallStmtContext ctx) {
         ASTNode node = new ASTNode("CallStmt", ctx.ID().getText());
         if (ctx.usingCallClause() != null) {
