@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Scanner;
 
 import preprocessing.BabyCobolParserUtils;
+import preprocessing.GoToException;
 import preprocessing.NextSentenceException;
 import preprocessing.StopProgramException;
 import ast.*;
@@ -99,6 +100,8 @@ public class BabyCobolInterpreter {
 
     private void executeProcedure(ASTNode procedureNode) {
         // 1) pre-pass: indexing all paragraphs so they can be found by PERFORM
+        paragraphs.clear();
+        paragraphNames.clear();
         for (ASTNode child : procedureNode.getChildren()) {
             if (child.getType().equals("Paragraph")) {
                 String paraName = child.getText().toLowerCase();
@@ -108,7 +111,8 @@ public class BabyCobolInterpreter {
         }
 
         // 2) execution: running top level sentences and fall through paragraphs
-        for (ASTNode child : procedureNode.getChildren()) {
+        for (int i = 0; i < procedureNode.getChildren().size(); i++) {
+            ASTNode child = procedureNode.getChildren().get(i);
             if (child.getType().equals("Sentence")) {
                 try {
                     for (ASTNode statement : child.getChildren()) {
@@ -116,11 +120,17 @@ public class BabyCobolInterpreter {
                     }
                 } catch (NextSentenceException e) {
                     // NEXT SENTENCE skips to the next sentence
+                } catch (GoToException e) {
+                    i = indexOfParagraphChild(procedureNode, e.getTarget());
                 }
             } else if (child.getType().equals("Paragraph")) {
                 // apparently in COBOL execution falls through into paragraphs 
                 // unless stopped by a GO TO or STOP RUN
-                executeParagraph(child);
+                try {
+                    executeParagraph(child);
+                } catch (GoToException e) {
+                    i = indexOfParagraphChild(procedureNode, e.getTarget());
+                }
             }
         }
     }
@@ -181,12 +191,24 @@ public class BabyCobolInterpreter {
             case "CallStmt":
                 executeCall(statement);
                 break;
+            case "GoToStmt":
+                executeGoTo(statement);
+                break;
             default:
                 System.err.println("Unimplemented statement type: " + statement.getType());
         }
     }
 
     // --- statement implementations ---
+
+    private void executeGoTo(ASTNode node) {
+        String target = node.getText();
+        String key = target.toLowerCase();
+        if (!paragraphs.containsKey(key)) {
+            throw new RuntimeException("GO TO target paragraph does not exist: " + target);
+        }
+        throw new GoToException(key);
+    }
 
     private void executeCall(ASTNode node) {
         String programName = node.getText();
@@ -632,9 +654,36 @@ public class BabyCobolInterpreter {
         for (int i = 0; i < times; i++) {
             for (int p = startIndex; p <= endIndex; p++) {
                 String paraToExecute = paragraphNames.get(p);
-                executeParagraph(paragraphs.get(paraToExecute));
+                try {
+                    executeParagraph(paragraphs.get(paraToExecute));
+                } catch (GoToException e) {
+                    int targetIndex = paragraphNames.indexOf(e.getTarget());
+                    if (targetIndex < 0) {
+                        throw new RuntimeException("GO TO target paragraph does not exist: " + e.getTarget());
+                    }
+                    if (targetIndex < startIndex || targetIndex > endIndex) {
+                        throw e;
+                    }
+                    p = targetIndex - 1;
+                }
             }
         }
+    }
+
+    private int indexOfParagraphChild(ASTNode procedureNode, String target) {
+        String key = target.toLowerCase();
+        if (!paragraphs.containsKey(key)) {
+            throw new RuntimeException("GO TO target paragraph does not exist: " + target);
+        }
+
+        for (int i = 0; i < procedureNode.getChildren().size(); i++) {
+            ASTNode child = procedureNode.getChildren().get(i);
+            if (child.getType().equals("Paragraph") && child.getText().equalsIgnoreCase(key)) {
+                return i - 1;
+            }
+        }
+
+        throw new RuntimeException("GO TO target paragraph does not exist: " + target);
     }
 
     // --- Helper methods for Evaluate ---
