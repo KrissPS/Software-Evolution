@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Scanner;
 
 import preprocessing.NextSentenceException;
+import preprocessing.StopProgramException;
 import ast.*;
 
 public class BabyCobolInterpreter {
@@ -85,7 +86,11 @@ public class BabyCobolInterpreter {
 
         for (ASTNode child : programNode.getChildren()) {
             if (child.getType().equals("Procedure")) {
-                executeProcedure(child);
+                try {
+                    executeProcedure(child);
+                } catch (StopProgramException e) {
+                    return;
+                }
             }
         }
     }
@@ -170,8 +175,7 @@ public class BabyCobolInterpreter {
             case "NextSentenceStmt":
                 throw new NextSentenceException();
             case "StopStmt":
-                System.exit(0);
-                break;
+                throw new StopProgramException();
             default:
                 System.err.println("Unimplemented statement type: " + statement.getType());
         }

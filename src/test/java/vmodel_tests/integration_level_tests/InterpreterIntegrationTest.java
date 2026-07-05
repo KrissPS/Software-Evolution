@@ -147,11 +147,12 @@ public class InterpreterIntegrationTest {
     }
 
     @Test
-    public void testStopIsHandledInsideInterpreterWithoutSystemExit() throws Exception {
-        String interpreterSource = Files.readString(
-                Paths.get("src/main/java/interpreter/BabyCobolInterpreter.java"));
-
-        assertFalse(interpreterSource.contains("System.exit"),
+    public void testStopTerminatesProgramWithoutExitingJvm() throws Exception {
+        assertDoesNotThrow(() -> runProgram("stop_statement.babycob"),
                 "STOP should terminate BabyCOBOL execution without exiting the JVM");
+
+        String stdout = outContent.toString();
+        assertTrue(stdout.contains("BEFORE STOP"));
+        assertFalse(stdout.contains("AFTER STOP"));
     }
 }
