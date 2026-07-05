@@ -190,21 +190,80 @@ public class BabyCobolInterpreter {
 
     private void executeCall(ASTNode node) {
         String programName = node.getText();
-        if (!node.getChildren().isEmpty()) {
-            throw new RuntimeException("CALL USING is not implemented yet: " + programName);
-        }
 
         String resourcePath = "/examples/" + programName.toLowerCase(Locale.ROOT) + ".babycob";
         try {
             String source = BabyCobolParserUtils.readResource(resourcePath);
             String processed = BabyCobolParserUtils.preprocess(source);
             ASTUtils.ASTResult ast = ASTUtils.buildASTAndSymbolTable(processed);
-            new BabyCobolInterpreter(ast.symbolTable).execute(ast.root);
+            BabyCobolInterpreter calledInterpreter = new BabyCobolInterpreter(ast.symbolTable);
+            bindCallArguments(node, ast.root, calledInterpreter, programName);
+            calledInterpreter.execute(ast.root);
         } catch (RuntimeException e) {
             throw new RuntimeException("CALL failed for program " + programName + ": " + e.getMessage(), e);
         } catch (Exception e) {
             throw new RuntimeException("CALL failed for program " + programName + ": " + e.getMessage(), e);
         }
+    }
+
+    private void bindCallArguments(ASTNode callNode, ASTNode calledProgramRoot,
+                                   BabyCobolInterpreter calledInterpreter, String programName) {
+        ASTNode callUsingClause = findChild(callNode, "UsingCallClause");
+        ASTNode procedureUsingClause = findProcedureUsingClause(calledProgramRoot);
+
+        if (callUsingClause == null) {
+            if (procedureUsingClause != null && !procedureUsingClause.getChildren().isEmpty()) {
+                throw new RuntimeException("CALL USING argument count mismatch for " + programName
+                        + ": caller provided 0 but callee expects "
+                        + procedureUsingClause.getChildren().size());
+            }
+            return;
+        }
+
+        if (procedureUsingClause == null) {
+            throw new RuntimeException("CALL USING argument count mismatch for " + programName
+                    + ": caller provided " + callUsingClause.getChildren().size()
+                    + " but callee expects 0");
+        }
+
+        int callerCount = callUsingClause.getChildren().size();
+        int calleeCount = procedureUsingClause.getChildren().size();
+        if (callerCount != calleeCount) {
+            throw new RuntimeException("CALL USING argument count mismatch for " + programName
+                    + ": caller provided " + callerCount + " but callee expects " + calleeCount);
+        }
+
+        for (int i = 0; i < callerCount; i++) {
+            String callerName = callUsingClause.getChildren().get(i).getText().toLowerCase(Locale.ROOT);
+            String calleeName = procedureUsingClause.getChildren().get(i).getText().toLowerCase(Locale.ROOT);
+
+            if (!memory.containsKey(callerName)) {
+                throw new RuntimeException("CALL USING argument is not initialized: " + callerName);
+            }
+            if (!calledInterpreter.memory.containsKey(calleeName)) {
+                throw new RuntimeException("CALL USING parameter is not initialized in " + programName
+                        + ": " + calleeName);
+            }
+
+            calledInterpreter.memory.put(calleeName, memory.get(callerName));
+        }
+    }
+
+    private ASTNode findProcedureUsingClause(ASTNode programRoot) {
+        ASTNode procedure = findChild(programRoot, "Procedure");
+        if (procedure == null) {
+            return null;
+        }
+        return findChild(procedure, "UsingProcedureClause");
+    }
+
+    private ASTNode findChild(ASTNode node, String type) {
+        for (ASTNode child : node.getChildren()) {
+            if (child.getType().equals(type)) {
+                return child;
+            }
+        }
+        return null;
     }
 
     private void executeDisplay(ASTNode node) {
