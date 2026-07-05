@@ -52,7 +52,11 @@ occursClause
     ;
 
 procedure
-    : PROCEDURE DIVISION DOT sentence* paragraph*
+    : PROCEDURE DIVISION usingProcedureClause? DOT sentence* paragraph*
+    ;
+
+usingProcedureClause
+    : USING qualifiedName+
     ;
 
 paragraph
@@ -78,6 +82,7 @@ statement
     | loopStmt
     | nextSentenceStmt
     | goToStmt
+    | callStmt
     ;
 
 displayStmt
@@ -275,4 +280,12 @@ nextSentenceStmt
 
 goToStmt
     : GO TO ID
+    ;
+
+callStmt
+    : CALL ID usingCallClause?
+    ;
+
+usingCallClause
+    : USING qualifiedName+
     ;

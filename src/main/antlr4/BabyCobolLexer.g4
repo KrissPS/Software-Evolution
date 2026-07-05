@@ -41,6 +41,8 @@ REPLACING : 'REPLACING';
 NEXT    : 'NEXT';
 SENTENCE : 'SENTENCE';
 GO : 'GO';
+CALL : 'CALL';
+USING : 'USING';
 
 // DATA DIVISION FEAT
 PICTURE : 'PICTURE';
@@ -79,4 +81,3 @@ PIC_CHAR : [9AXZSV];
 STRING   : '"' (~["\r\n])* '"';
 
 WS : [ \t\r\n]+ -> skip;
-
