@@ -2,10 +2,12 @@ package interpreter;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import java.util.Scanner;
 
+import preprocessing.BabyCobolParserUtils;
 import preprocessing.NextSentenceException;
 import preprocessing.StopProgramException;
 import ast.*;
@@ -176,12 +178,34 @@ public class BabyCobolInterpreter {
                 throw new NextSentenceException();
             case "StopStmt":
                 throw new StopProgramException();
+            case "CallStmt":
+                executeCall(statement);
+                break;
             default:
                 System.err.println("Unimplemented statement type: " + statement.getType());
         }
     }
 
     // --- statement implementations ---
+
+    private void executeCall(ASTNode node) {
+        String programName = node.getText();
+        if (!node.getChildren().isEmpty()) {
+            throw new RuntimeException("CALL USING is not implemented yet: " + programName);
+        }
+
+        String resourcePath = "/examples/" + programName.toLowerCase(Locale.ROOT) + ".babycob";
+        try {
+            String source = BabyCobolParserUtils.readResource(resourcePath);
+            String processed = BabyCobolParserUtils.preprocess(source);
+            ASTUtils.ASTResult ast = ASTUtils.buildASTAndSymbolTable(processed);
+            new BabyCobolInterpreter(ast.symbolTable).execute(ast.root);
+        } catch (RuntimeException e) {
+            throw new RuntimeException("CALL failed for program " + programName + ": " + e.getMessage(), e);
+        } catch (Exception e) {
+            throw new RuntimeException("CALL failed for program " + programName + ": " + e.getMessage(), e);
+        }
+    }
 
     private void executeDisplay(ASTNode node) {
         boolean noAdvancing = false;
