@@ -265,6 +265,9 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
     @Override
     public ASTNode visitProcedure(BabyCobolParser.ProcedureContext ctx) {
         ASTNode node = new ASTNode("Procedure");
+        if (ctx.usingProcedureClause() != null) {
+            node.addChild(visit(ctx.usingProcedureClause()));
+        }
         for (BabyCobolParser.SentenceContext sentence : ctx.sentence()) {
             node.addChild(visit(sentence));
         }
@@ -273,6 +276,17 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
             node.addChild(visit(paragraph));
         }
 
+        return node;
+    }
+
+    @Override
+    public ASTNode visitUsingProcedureClause(BabyCobolParser.UsingProcedureClauseContext ctx) {
+        ASTNode node = new ASTNode("UsingProcedureClause");
+        for (BabyCobolParser.QualifiedNameContext qn : ctx.qualifiedName()) {
+            String qnText = qualifiedNameText(qn);
+            String resolvedName = resolveAndGetSimpleName(qnText, "PROCEDURE USING clause");
+            node.addChild(new ASTNode("ID", resolvedName));
+        }
         return node;
     }
 
@@ -610,6 +624,26 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
     @Override
     public ASTNode visitNextSentenceStmt(BabyCobolParser.NextSentenceStmtContext ctx) {
         return new ASTNode("NextSentenceStmt");
+    }
+
+    @Override
+    public ASTNode visitCallStmt(BabyCobolParser.CallStmtContext ctx) {
+        ASTNode node = new ASTNode("CallStmt", ctx.ID().getText());
+        if (ctx.usingCallClause() != null) {
+            node.addChild(visit(ctx.usingCallClause()));
+        }
+        return node;
+    }
+
+    @Override
+    public ASTNode visitUsingCallClause(BabyCobolParser.UsingCallClauseContext ctx) {
+        ASTNode node = new ASTNode("UsingCallClause");
+        for (BabyCobolParser.QualifiedNameContext qn : ctx.qualifiedName()) {
+            String qnText = qualifiedNameText(qn);
+            String resolvedName = resolveAndGetSimpleName(qnText, "CALL USING clause");
+            node.addChild(new ASTNode("ID", resolvedName));
+        }
+        return node;
     }
 
     @Override
