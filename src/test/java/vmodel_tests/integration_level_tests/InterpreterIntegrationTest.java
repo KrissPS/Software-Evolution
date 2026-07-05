@@ -264,4 +264,54 @@ public class InterpreterIntegrationTest {
         assertTrue(exception.getMessage().contains("caller provided 0"),
                 "No-args-to-USING mismatch should mention provided count, got: " + exception.getMessage());
     }
+
+    @Test
+    public void testGoToJumpsToTargetParagraph() throws Exception {
+        runProgram("goto_basic.babycob");
+
+        String stdout = outContent.toString();
+
+        assertTrue(stdout.contains("START"));
+        assertFalse(stdout.contains("SHOULD NOT PRINT"));
+        assertTrue(stdout.contains("TARGET REACHED"));
+        assertTrue(stdout.indexOf("START") < stdout.indexOf("TARGET REACHED"));
+    }
+
+    @Test
+    public void testGoToMissingParagraphThrowsRuntimeError() {
+        RuntimeException exception = assertThrows(RuntimeException.class, () ->
+                runProgram("goto_missing_target.babycob")
+        );
+
+        assertTrue(exception.getMessage().contains("GO TO"),
+                "Missing target error should mention GO TO, got: " + exception.getMessage());
+        assertTrue(exception.getMessage().contains("MISSING-PARAGRAPH"),
+                "Missing target error should mention target paragraph, got: " + exception.getMessage());
+    }
+
+    @Test
+    public void testGoToInsideLoopTerminatesLoop() throws Exception {
+        runProgram("goto_exits_loop.babycob");
+
+        String stdout = outContent.toString();
+
+        assertTrue(stdout.contains("LOOP BEFORE GOTO"));
+        assertFalse(stdout.contains("LOOP AFTER GOTO"));
+        assertTrue(stdout.contains("DONE AFTER LOOP"));
+        assertTrue(stdout.indexOf("LOOP BEFORE GOTO") < stdout.indexOf("DONE AFTER LOOP"));
+    }
+
+    @Test
+    public void testGoToOutsidePerformThroughTerminatesPerform() throws Exception {
+        runProgram("goto_exits_perform_through.babycob");
+
+        String stdout = outContent.toString();
+
+        assertTrue(stdout.contains("MAIN BEFORE PERFORM"));
+        assertTrue(stdout.contains("FIRST BEFORE GOTO"));
+        assertFalse(stdout.contains("SECOND SHOULD NOT RUN"));
+        assertFalse(stdout.contains("MAIN AFTER PERFORM"));
+        assertTrue(stdout.contains("OUTSIDE TARGET"));
+        assertTrue(stdout.indexOf("FIRST BEFORE GOTO") < stdout.indexOf("OUTSIDE TARGET"));
+    }
 }
