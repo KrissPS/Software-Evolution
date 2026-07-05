@@ -194,4 +194,42 @@ public class InterpreterIntegrationTest {
         assertTrue(stdout.indexOf("MAIN BEFORE STOP CALL") < stdout.indexOf("CALLEE BEFORE STOP"));
         assertTrue(stdout.indexOf("CALLEE BEFORE STOP") < stdout.indexOf("MAIN AFTER STOP CALL"));
     }
+
+    @Test
+    public void testCallUsingPassesSingleArgumentByPosition() throws Exception {
+        runProgram("call_main_using_single.babycob");
+
+        String stdout = outContent.toString();
+
+        assertTrue(stdout.contains("MAIN BEFORE SINGLE"));
+        assertTrue(stdout.contains("CALLEE GOT HELLO"));
+        assertTrue(stdout.contains("MAIN AFTER SINGLE"));
+        assertTrue(stdout.indexOf("MAIN BEFORE SINGLE") < stdout.indexOf("CALLEE GOT HELLO"));
+        assertTrue(stdout.indexOf("CALLEE GOT HELLO") < stdout.indexOf("MAIN AFTER SINGLE"));
+    }
+
+    @Test
+    public void testCallUsingPassesMultipleArgumentsByPosition() throws Exception {
+        runProgram("call_main_using_multiple.babycob");
+
+        String stdout = outContent.toString();
+
+        assertTrue(stdout.contains("CALLEE FIRST ALPHA"));
+        assertTrue(stdout.contains("CALLEE SECOND BETA"));
+        assertTrue(stdout.indexOf("CALLEE FIRST ALPHA") < stdout.indexOf("CALLEE SECOND BETA"));
+    }
+
+    @Test
+    public void testCallUsingCountMismatchThrowsRuntimeError() {
+        RuntimeException exception = assertThrows(RuntimeException.class, () ->
+                runProgram("call_main_using_count_mismatch.babycob")
+        );
+
+        assertTrue(exception.getMessage().contains("CALL"),
+                "USING count mismatch should mention CALL, got: " + exception.getMessage());
+        assertTrue(exception.getMessage().contains("USING"),
+                "USING count mismatch should mention USING, got: " + exception.getMessage());
+        assertTrue(exception.getMessage().contains("CALL-ECHO-TWO-ARGS"),
+                "USING count mismatch should mention target program, got: " + exception.getMessage());
+    }
 }
