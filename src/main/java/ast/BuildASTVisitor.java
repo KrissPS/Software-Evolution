@@ -272,7 +272,13 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
             node.addChild(visit(sentence));
         }
         // traverse and add paragraphs to the AST
+        Set<String> paragraphNames = new HashSet<>();
         for (BabyCobolParser.ParagraphContext paragraph : ctx.paragraph()) {
+            String paragraphName = paragraph.ID().getText();
+            String normalizedName = paragraphName.toLowerCase(Locale.ROOT);
+            if (!paragraphNames.add(normalizedName)) {
+                throw new IllegalArgumentException("Duplicate paragraph name: " + paragraphName);
+            }
             node.addChild(visit(paragraph));
         }
 
