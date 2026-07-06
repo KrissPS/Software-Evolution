@@ -202,12 +202,34 @@ public class BabyCobolInterpreter {
     // --- statement implementations ---
 
     private void executeGoTo(ASTNode node) {
-        String target = node.getText();
-        String key = target.toLowerCase();
-        if (!paragraphs.containsKey(key)) {
-            throw new RuntimeException("GO TO target paragraph does not exist: " + target);
+        throw new GoToException(resolveGoToTarget(node.getText()));
+    }
+
+    private String resolveGoToTarget(String target) {
+        String key = target.toLowerCase(Locale.ROOT);
+        if (paragraphs.containsKey(key)) {
+            return key;
         }
-        throw new GoToException(key);
+
+        if (!memory.containsKey(key)) {
+            throw new RuntimeException("GO TO target is neither paragraph nor field: " + target);
+        }
+
+        Object runtimeValue = memory.get(key);
+        if (runtimeValue instanceof Object[]) {
+            throw new RuntimeException("GO TO computed target field cannot be an OCCURS array: " + target);
+        }
+
+        String computedTarget = String.valueOf(runtimeValue).trim();
+        if (computedTarget.isEmpty()) {
+            throw new RuntimeException("GO TO computed target is empty for field: " + target);
+        }
+
+        String computedKey = computedTarget.toLowerCase(Locale.ROOT);
+        if (!paragraphs.containsKey(computedKey)) {
+            throw new RuntimeException("GO TO computed target paragraph does not exist: " + computedTarget);
+        }
+        return computedKey;
     }
 
     private void executeCall(ASTNode node) {
