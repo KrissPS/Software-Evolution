@@ -837,12 +837,28 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
     private String resolveAndGetSimpleName(String qualifiedName, String contextDescription) {
         Symbol resolved = resolveQualifiedName(qualifiedName, contextDescription);
         if (resolved != null) {
+            List<String> parts = splitQualifiedName(qualifiedName);
+            boolean explicitlyQualified = parts.size() > 1;
+            boolean duplicateSimpleName = symbolTable.getSymbolsByName(resolved.getName()).size() > 1;
+            if (explicitlyQualified || duplicateSimpleName) {
+                return qualifiedRuntimeName(resolved);
+            }
             return resolved.getName();
         }
         // Symbol not in the table (no DATA DIVISION or special identifier like TRUE):
         // return just the simple (first) name part
         List<String> parts = splitQualifiedName(qualifiedName);
         return parts.isEmpty() ? qualifiedName : parts.get(0);
+    }
+
+    private String qualifiedRuntimeName(Symbol symbol) {
+        List<String> parts = new ArrayList<>();
+        Symbol current = symbol;
+        while (current != null) {
+            parts.add(current.getName());
+            current = current.getParent();
+        }
+        return String.join(" OF ", parts);
     }
 
     /**

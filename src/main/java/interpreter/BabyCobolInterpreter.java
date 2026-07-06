@@ -1,6 +1,8 @@
 package interpreter;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -48,20 +50,31 @@ public class BabyCobolInterpreter {
 
             if (pic != null && !pic.isEmpty()) {
                 // this is an elementary field
+                String qualifiedKey = memoryKey(symbol);
+                Object defaultValue = defaultValueForPicture(pic);
                 if (symbol.getOccurs() > 0) {
                     // OCCURS array-- creates an array of initialized values
                     Object[] array = new Object[symbol.getOccurs()];
                     for (int i = 0; i < symbol.getOccurs(); i++) {
                         array[i] = defaultValueForPicture(pic);
                     }
-                    memory.put(symbol.getName().toLowerCase(), array);
+                    memory.put(qualifiedKey, array);
+                    if (hasUnambiguousSimpleName(symbol)) {
+                        memory.put(symbol.getName().toLowerCase(Locale.ROOT), array);
+                    }
                 } else {
-                    memory.put(symbol.getName().toLowerCase(), defaultValueForPicture(pic));
+                    memory.put(qualifiedKey, defaultValue);
+                    if (hasUnambiguousSimpleName(symbol)) {
+                        memory.put(symbol.getName().toLowerCase(Locale.ROOT), defaultValue);
+                    }
                 }
             } else if (symbol.getOccurs() > 0) {
                 // group record with OCCURS, initialize as placeholder
                 Object[] array = new Object[symbol.getOccurs()];
-                memory.put(symbol.getName().toLowerCase(), array);
+                memory.put(memoryKey(symbol), array);
+                if (hasUnambiguousSimpleName(symbol)) {
+                    memory.put(symbol.getName().toLowerCase(Locale.ROOT), array);
+                }
             }
             // records without OCCURS are not stored directly, their children are initialized
         }
@@ -77,6 +90,61 @@ public class BabyCobolInterpreter {
             return 0.0;
         }
         return "";
+    }
+
+    private String memoryKey(Symbol symbol) {
+        List<String> parts = new ArrayList<>();
+        Symbol current = symbol;
+        while (current != null) {
+            parts.add(current.getName().toLowerCase(Locale.ROOT));
+            current = current.getParent();
+        }
+        return String.join(" of ", parts);
+    }
+
+    private boolean hasUnambiguousSimpleName(Symbol symbol) {
+        return symbolTable.getSymbolsByName(symbol.getName()).size() == 1;
+    }
+
+    private boolean hasMemoryValue(String name) {
+        return memory.containsKey(normalizeRuntimeName(name));
+    }
+
+    private Object getMemoryValue(String name) {
+        return memory.get(normalizeRuntimeName(name));
+    }
+
+    private void setMemoryValue(String name, Object value) {
+        String key = normalizeRuntimeName(name);
+        memory.put(key, value);
+
+        Symbol symbol = symbolForRuntimeName(name);
+        if (symbol != null) {
+            String qualifiedKey = memoryKey(symbol);
+            memory.put(qualifiedKey, value);
+            if (hasUnambiguousSimpleName(symbol)) {
+                memory.put(symbol.getName().toLowerCase(Locale.ROOT), value);
+            }
+        }
+    }
+
+    private String normalizeRuntimeName(String name) {
+        return name.toLowerCase(Locale.ROOT);
+    }
+
+    private Symbol symbolForRuntimeName(String name) {
+        String key = normalizeRuntimeName(name);
+        for (Symbol symbol : symbolTable.getAllSymbols()) {
+            if (memoryKey(symbol).equals(key)) {
+                return symbol;
+            }
+        }
+
+        List<Symbol> symbols = symbolTable.getSymbolsByName(name);
+        if (symbols.size() == 1) {
+            return symbols.get(0);
+        }
+        return null;
     }
 
     /**
@@ -363,14 +431,20 @@ public class BabyCobolInterpreter {
         for (int i = 1; i < node.getChildren().size(); i++) {
             ASTNode target = node.getChildren().get(i);
             if (target.getType().equals("ToID")) {
-                String varName = target.getText().toLowerCase();
+                String varName = target.getText().toLowerCase(Locale.ROOT);
+                if (!figurativeMove && sourceNode.getType().equals("AtomicID")
+                        && isRecordMove(sourceNode.getText(), target.getText())) {
+                    executeRecordMove(sourceNode.getText(), target.getText());
+                    continue;
+                }
+
                 Object value = figurativeMove
                         ? evaluateFigurativeConstantForTarget(sourceNode.getText(), varName)
                         : evaluateAtomic(sourceNode);
 
                 // if the target is an OCCURS array, assign value to all elements
-                if (memory.containsKey(varName) && memory.get(varName) instanceof Object[]) {
-                    Object[] array = (Object[]) memory.get(varName);
+                if (hasMemoryValue(varName) && getMemoryValue(varName) instanceof Object[]) {
+                    Object[] array = (Object[]) getMemoryValue(varName);
                     // if the source is also an array, copy element-wise. otherwise broadcast
                     if (value instanceof Object[]) {
                         Object[] srcArray = (Object[]) value;
@@ -382,19 +456,70 @@ public class BabyCobolInterpreter {
                             array[j] = coerceValue(value, array[j]);
                         }
                     }
+                    setMemoryValue(varName, array);
                 } else {
                     // coerce value to match the target's type if possible
-                    if (memory.containsKey(varName)) {
-                        value = coerceValue(value, memory.get(varName));
+                    if (hasMemoryValue(varName)) {
+                        value = coerceValue(value, getMemoryValue(varName));
                     }
-                    memory.put(varName, value);
+                    setMemoryValue(varName, value);
                 }
             }
         }
     }
 
+    private boolean isRecordMove(String sourceName, String targetName) {
+        Symbol source = symbolForRuntimeName(sourceName);
+        Symbol target = symbolForRuntimeName(targetName);
+        return source != null && target != null && source.isRecord() && target.isRecord();
+    }
+
+    private void executeRecordMove(String sourceName, String targetName) {
+        Symbol source = symbolForRuntimeName(sourceName);
+        Symbol target = symbolForRuntimeName(targetName);
+        if (source == null || target == null || !source.isRecord() || !target.isRecord()) {
+            throw new RuntimeException("MOVE requires record source and target for corresponding move: "
+                    + sourceName + " TO " + targetName);
+        }
+        moveCorrespondingChildren(source, target);
+    }
+
+    private void moveCorrespondingChildren(Symbol sourceRecord, Symbol targetRecord) {
+        Map<String, Symbol> sourceChildren = directChildrenByName(sourceRecord, "source");
+        Map<String, Symbol> targetChildren = directChildrenByName(targetRecord, "target");
+
+        for (Map.Entry<String, Symbol> entry : sourceChildren.entrySet()) {
+            Symbol sourceChild = entry.getValue();
+            Symbol targetChild = targetChildren.get(entry.getKey());
+            if (targetChild == null) {
+                continue;
+            }
+            if (sourceChild.isRecord() && targetChild.isRecord()) {
+                moveCorrespondingChildren(sourceChild, targetChild);
+            } else if (!sourceChild.isRecord() && !targetChild.isRecord()) {
+                Object value = getMemoryValue(memoryKey(sourceChild));
+                setMemoryValue(memoryKey(targetChild), coerceValue(value, getMemoryValue(memoryKey(targetChild))));
+            }
+        }
+    }
+
+    private Map<String, Symbol> directChildrenByName(Symbol parent, String side) {
+        Map<String, Symbol> children = new LinkedHashMap<>();
+        for (Symbol candidate : symbolTable.getAllSymbols()) {
+            if (candidate.getParent() == parent) {
+                String key = candidate.getName().toLowerCase(Locale.ROOT);
+                if (children.containsKey(key)) {
+                    throw new RuntimeException("Ambiguous MOVE corresponding " + side
+                            + " child name '" + candidate.getName() + "' under record " + parent.getName());
+                }
+                children.put(key, candidate);
+            }
+        }
+        return children;
+    }
+
     private Object evaluateFigurativeConstantForTarget(String constant, String targetName) {
-        Symbol targetSymbol = symbolTable.getSymbol(targetName);
+        Symbol targetSymbol = symbolForRuntimeName(targetName);
         if (targetSymbol == null || targetSymbol.getPicture() == null || targetSymbol.getPicture().isEmpty()) {
             throw new RuntimeException("Cannot MOVE " + constant + " to non-elementary target: " + targetName);
         }
