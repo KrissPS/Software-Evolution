@@ -23,7 +23,7 @@ public class KeywordResolver {
             "REMAINDER", "EVALUATE", "ALSO", "END", "WHEN", "OTHER", "THROUGH",
             "IF", "THEN", "ELSE", "AND", "OR", "NOT", "SUBTRACT", "FROM",
             "MOVE", "PERFORM", "STOP", "PICTURE", "IS", "LIKE", "OF", "OCCURS", "TIMES",
-            "DISPLAY", "WITH", "NO", "ADVANCING"));
+            "DISPLAY", "WITH", "NO", "ADVANCING", "ALTER", "PROCEED"));
 
     public static String resolve(String code) throws AmbiguityException {
         List<LowercaseKeywordOccurrence> lowercaseKeywords = findLowercaseKeywords(code);

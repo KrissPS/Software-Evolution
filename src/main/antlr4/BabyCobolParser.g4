@@ -82,6 +82,7 @@ statement
     | loopStmt
     | nextSentenceStmt
     | goToStmt
+    | alterStmt
     | callStmt
     ;
 
@@ -291,6 +292,10 @@ nextSentenceStmt
 
 goToStmt
     : GO TO ID
+    ;
+
+alterStmt
+    : ALTER ID TO PROCEED TO ID
     ;
 
 callStmt
