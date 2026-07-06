@@ -147,6 +147,42 @@ public class InterpreterIntegrationTest {
     }
 
     @Test
+    public void testMoveSpacesUsesTargetPicture() throws Exception {
+        Map<String, Object> memory = runProgram("figurative_constants_spaces.babycob").getMemory();
+
+        assertEquals(0.0, (Double) memory.get("num-field"));
+        assertEquals("   ", memory.get("text-field"));
+        assertEquals("   ", memory.get("alpha-field"));
+        assertEquals("   ", memory.get("zero-field"));
+        assertEquals(0.0, (Double) memory.get("signed-field"));
+        assertEquals(0.0, (Double) memory.get("decimal-field"));
+    }
+
+    @Test
+    public void testMoveHighValuesUsesTargetPicture() throws Exception {
+        Map<String, Object> memory = runProgram("figurative_constants_high_values.babycob").getMemory();
+
+        assertEquals(999.0, (Double) memory.get("num-field"));
+        assertEquals("\u00ff\u00ff\u00ff", memory.get("text-field"));
+        assertEquals("zzz", memory.get("alpha-field"));
+        assertEquals("999", memory.get("zero-field"));
+        assertEquals(99.0, (Double) memory.get("signed-field"));
+        assertEquals(9.99, (Double) memory.get("decimal-field"), 0.0001);
+    }
+
+    @Test
+    public void testMoveLowValuesUsesTargetPicture() throws Exception {
+        Map<String, Object> memory = runProgram("figurative_constants_low_values.babycob").getMemory();
+
+        assertEquals(0.0, (Double) memory.get("num-field"));
+        assertEquals("\u0000\u0000\u0000", memory.get("text-field"));
+        assertEquals("   ", memory.get("alpha-field"));
+        assertEquals("   ", memory.get("zero-field"));
+        assertEquals(0.0, (Double) memory.get("signed-field"));
+        assertEquals(0.0, (Double) memory.get("decimal-field"));
+    }
+
+    @Test
     public void testPerformThroughWithoutTimesExecutesRangeOnce() throws Exception {
         runProgram("perform_through_once.babycob");
 
