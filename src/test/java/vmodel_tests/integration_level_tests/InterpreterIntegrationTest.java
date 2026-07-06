@@ -429,4 +429,91 @@ public class InterpreterIntegrationTest {
         assertTrue(stdout.contains("FIRST AFTER BACKWARD"));
         assertTrue(stdout.indexOf("SECOND FIRST") < stdout.indexOf("FIRST AFTER BACKWARD"));
     }
+
+    @Test
+    public void testComputableGoToJumpsToRuntimeParagraphValue() throws Exception {
+        runProgram("goto_computable_basic.babycob");
+
+        String stdout = outContent.toString();
+
+        assertTrue(stdout.contains("BEFORE COMPUTED GOTO"));
+        assertFalse(stdout.contains("SHOULD NOT PRINT"));
+        assertTrue(stdout.contains("COMPUTED TARGET REACHED"));
+        assertTrue(stdout.indexOf("BEFORE COMPUTED GOTO") < stdout.indexOf("COMPUTED TARGET REACHED"));
+    }
+
+    @Test
+    public void testComputableGoToBadRuntimeTargetThrowsRuntimeError() {
+        RuntimeException exception = assertThrows(RuntimeException.class, () ->
+                runProgram("goto_computable_bad_target.babycob")
+        );
+
+        assertTrue(exception.getMessage().contains("GO TO"),
+                "Bad computed target error should mention GO TO, got: " + exception.getMessage());
+        assertTrue(exception.getMessage().contains("MISSING-PARAGRAPH"),
+                "Bad computed target error should mention runtime target, got: " + exception.getMessage());
+    }
+
+    @Test
+    public void testComputableGoToMissingFieldThrowsRuntimeError() {
+        RuntimeException exception = assertThrows(RuntimeException.class, () ->
+                runProgram("goto_computable_missing_field.babycob")
+        );
+
+        assertTrue(exception.getMessage().contains("GO TO"),
+                "Missing field error should mention GO TO, got: " + exception.getMessage());
+        assertTrue(exception.getMessage().contains("TARGET-FIELD"),
+                "Missing field error should mention unresolved identifier, got: " + exception.getMessage());
+    }
+
+    @Test
+    public void testGoToParagraphNameWinsOverFieldName() throws Exception {
+        runProgram("goto_computable_paragraph_wins.babycob");
+
+        String stdout = outContent.toString();
+
+        assertTrue(stdout.contains("STATIC TARGET WINS"));
+        assertFalse(stdout.contains("COMPUTED TARGET SHOULD NOT WIN"));
+    }
+
+    @Test
+    public void testComputableGoToInsideLoopTerminatesLoop() throws Exception {
+        runProgram("goto_computable_exits_loop.babycob");
+
+        String stdout = outContent.toString();
+
+        assertTrue(stdout.contains("LOOP BEFORE COMPUTED GOTO"));
+        assertFalse(stdout.contains("LOOP AFTER COMPUTED GOTO"));
+        assertTrue(stdout.contains("DONE AFTER COMPUTED LOOP"));
+        assertTrue(stdout.indexOf("LOOP BEFORE COMPUTED GOTO") < stdout.indexOf("DONE AFTER COMPUTED LOOP"));
+    }
+
+    @Test
+    public void testComputableGoToOutsidePerformThroughTerminatesPerform() throws Exception {
+        runProgram("goto_computable_exits_perform_through.babycob");
+
+        String stdout = outContent.toString();
+
+        assertTrue(stdout.contains("MAIN BEFORE PERFORM"));
+        assertTrue(stdout.contains("FIRST BEFORE COMPUTED GOTO"));
+        assertFalse(stdout.contains("SECOND SHOULD NOT RUN"));
+        assertFalse(stdout.contains("MAIN AFTER PERFORM"));
+        assertTrue(stdout.contains("OUTSIDE COMPUTED TARGET"));
+        assertTrue(stdout.indexOf("FIRST BEFORE COMPUTED GOTO") < stdout.indexOf("OUTSIDE COMPUTED TARGET"));
+    }
+
+    @Test
+    public void testComputableGoToInsidePerformThroughContinuesAtTargetInsideRange() throws Exception {
+        runProgram("goto_computable_inside_perform_through_range.babycob");
+
+        String stdout = outContent.toString();
+
+        assertTrue(stdout.contains("MAIN BEFORE PERFORM"));
+        assertTrue(stdout.contains("FIRST BEFORE COMPUTED GOTO"));
+        assertFalse(stdout.contains("SECOND SHOULD NOT RUN"));
+        assertTrue(stdout.contains("THIRD COMPUTED TARGET"));
+        assertTrue(stdout.contains("MAIN AFTER PERFORM"));
+        assertTrue(stdout.indexOf("FIRST BEFORE COMPUTED GOTO") < stdout.indexOf("THIRD COMPUTED TARGET"));
+        assertTrue(stdout.indexOf("THIRD COMPUTED TARGET") < stdout.indexOf("MAIN AFTER PERFORM"));
+    }
 }
