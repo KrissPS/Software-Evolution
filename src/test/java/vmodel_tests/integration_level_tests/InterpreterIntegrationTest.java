@@ -147,6 +147,59 @@ public class InterpreterIntegrationTest {
     }
 
     @Test
+    public void testPerformThroughWithoutTimesExecutesRangeOnce() throws Exception {
+        runProgram("perform_through_once.babycob");
+
+        String stdout = outContent.toString();
+
+        assertTrue(stdout.contains("MAIN BEFORE PERFORM"));
+        assertTrue(stdout.contains("FIRST IN RANGE"));
+        assertTrue(stdout.contains("SECOND IN RANGE"));
+        assertTrue(stdout.contains("MAIN AFTER PERFORM"));
+        assertTrue(stdout.indexOf("MAIN BEFORE PERFORM") < stdout.indexOf("FIRST IN RANGE"));
+        assertTrue(stdout.indexOf("FIRST IN RANGE") < stdout.indexOf("SECOND IN RANGE"));
+        assertTrue(stdout.indexOf("SECOND IN RANGE") < stdout.indexOf("MAIN AFTER PERFORM"));
+    }
+
+    @Test
+    public void testPerformMissingParagraphThrowsRuntimeError() {
+        RuntimeException exception = assertThrows(RuntimeException.class, () ->
+                runProgram("perform_missing_target.babycob")
+        );
+
+        assertTrue(exception.getMessage().contains("PERFORM"),
+                "Missing target error should mention PERFORM, got: " + exception.getMessage());
+        assertTrue(exception.getMessage().contains("missing-target"),
+                "Missing target error should mention target paragraph, got: " + exception.getMessage());
+    }
+
+    @Test
+    public void testPerformThroughMissingEndParagraphThrowsRuntimeError() {
+        RuntimeException exception = assertThrows(RuntimeException.class, () ->
+                runProgram("perform_through_missing_end.babycob")
+        );
+
+        assertTrue(exception.getMessage().contains("PERFORM"),
+                "Missing THROUGH target error should mention PERFORM, got: " + exception.getMessage());
+        assertTrue(exception.getMessage().contains("missing-end"),
+                "Missing THROUGH target error should mention end paragraph, got: " + exception.getMessage());
+    }
+
+    @Test
+    public void testPerformThroughReversedRangeThrowsRuntimeError() {
+        RuntimeException exception = assertThrows(RuntimeException.class, () ->
+                runProgram("perform_through_reversed_range.babycob")
+        );
+
+        assertTrue(exception.getMessage().contains("PERFORM"),
+                "Reversed THROUGH range error should mention PERFORM, got: " + exception.getMessage());
+        assertTrue(exception.getMessage().contains("first"),
+                "Reversed THROUGH range error should mention start paragraph, got: " + exception.getMessage());
+        assertTrue(exception.getMessage().contains("second"),
+                "Reversed THROUGH range error should mention end paragraph, got: " + exception.getMessage());
+    }
+
+    @Test
     public void testStopTerminatesProgramWithoutExitingJvm() throws Exception {
         assertDoesNotThrow(() -> runProgram("stop_statement.babycob"),
                 "STOP should terminate BabyCOBOL execution without exiting the JVM");
