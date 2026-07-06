@@ -623,4 +623,82 @@ public class InterpreterIntegrationTest {
         assertFalse(stdout.contains("COMPUTED FIELD TARGET"));
         assertFalse(stdout.contains("ORIGINAL COMPUTED TARGET"));
     }
+
+    @Test
+    public void testSignalDivisionByZeroRoutesToHandler() throws Exception {
+        runProgram("signal_division_by_zero_handler.babycob");
+
+        String stdout = outContent.toString();
+
+        assertTrue(stdout.contains("SIGNAL HANDLER RAN"));
+        assertFalse(stdout.contains("AFTER FAILURE"));
+    }
+
+    @Test
+    public void testSignalBadComputableGoToRoutesToHandler() throws Exception {
+        runProgram("signal_bad_computable_goto_handler.babycob");
+
+        String stdout = outContent.toString();
+
+        assertTrue(stdout.contains("GOTO SIGNAL HANDLER"));
+        assertFalse(stdout.contains("AFTER BAD GOTO"));
+    }
+
+    @Test
+    public void testSignalOffRestoresNormalFailure() {
+        RuntimeException exception = assertThrows(RuntimeException.class, () ->
+                runProgram("signal_off_restores_failure.babycob")
+        );
+
+        assertTrue(exception.getMessage().contains("GO TO"),
+                "SIGNAL OFF should restore normal GO TO failure, got: " + exception.getMessage());
+        assertTrue(exception.getMessage().contains("MISSING-TARGET"),
+                "SIGNAL OFF failure should mention bad runtime target, got: " + exception.getMessage());
+    }
+
+    @Test
+    public void testSignalHandlerDoesNotReturnToFailurePoint() throws Exception {
+        runProgram("signal_handler_does_not_return.babycob");
+
+        String stdout = outContent.toString();
+
+        assertTrue(stdout.contains("HANDLER START"));
+        assertFalse(stdout.contains("AFTER FAILURE"));
+    }
+
+    @Test
+    public void testSignalErrorInsideHandlerTerminatesNormally() {
+        RuntimeException exception = assertThrows(RuntimeException.class, () ->
+                runProgram("signal_handler_error_terminates.babycob")
+        );
+
+        assertTrue(exception.getMessage().contains("GO TO"),
+                "Error inside SIGNAL handler should terminate normally, got: " + exception.getMessage());
+        assertTrue(exception.getMessage().contains("BAD-IN-HANDLER"),
+                "Handler error should mention the failing target, got: " + exception.getMessage());
+    }
+
+    @Test
+    public void testSignalExitsLoop() throws Exception {
+        runProgram("signal_exits_loop.babycob");
+
+        String stdout = outContent.toString();
+
+        assertTrue(stdout.contains("LOOP BEFORE SIGNAL FAILURE"));
+        assertTrue(stdout.contains("LOOP SIGNAL HANDLER"));
+        assertFalse(stdout.contains("LOOP AFTER FAILURE"));
+    }
+
+    @Test
+    public void testSignalExitsPerformThrough() throws Exception {
+        runProgram("signal_exits_perform_through.babycob");
+
+        String stdout = outContent.toString();
+
+        assertTrue(stdout.contains("MAIN BEFORE PERFORM"));
+        assertTrue(stdout.contains("FIRST BEFORE SIGNAL FAILURE"));
+        assertTrue(stdout.contains("PERFORM SIGNAL HANDLER"));
+        assertFalse(stdout.contains("SECOND SHOULD NOT RUN"));
+        assertFalse(stdout.contains("MAIN AFTER PERFORM"));
+    }
 }
