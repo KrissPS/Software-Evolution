@@ -567,4 +567,60 @@ public class InterpreterIntegrationTest {
         assertTrue(stdout.indexOf("FIRST BEFORE COMPUTED GOTO") < stdout.indexOf("THIRD COMPUTED TARGET"));
         assertTrue(stdout.indexOf("THIRD COMPUTED TARGET") < stdout.indexOf("MAIN AFTER PERFORM"));
     }
+
+    @Test
+    public void testAlterChangesGoToTarget() throws Exception {
+        runProgram("alter_changes_target.babycob");
+
+        String stdout = outContent.toString();
+
+        assertTrue(stdout.contains("ALTERED TARGET"));
+        assertFalse(stdout.contains("ORIGINAL TARGET"));
+    }
+
+    @Test
+    public void testRepeatedAlterChangesTargetAgain() throws Exception {
+        runProgram("alter_repeated_changes_target.babycob");
+
+        String stdout = outContent.toString();
+
+        assertTrue(stdout.contains("SECOND ALTERED TARGET"));
+        assertFalse(stdout.contains("FIRST ALTERED TARGET"));
+        assertFalse(stdout.contains("ORIGINAL TARGET"));
+    }
+
+    @Test
+    public void testAlterInvalidParagraphShapeThrowsRuntimeError() {
+        RuntimeException exception = assertThrows(RuntimeException.class, () ->
+                runProgram("alter_invalid_paragraph_shape.babycob")
+        );
+
+        assertTrue(exception.getMessage().contains("ALTER"),
+                "Invalid ALTER shape error should mention ALTER, got: " + exception.getMessage());
+        assertTrue(exception.getMessage().contains("ROUTE"),
+                "Invalid ALTER shape error should mention paragraph, got: " + exception.getMessage());
+    }
+
+    @Test
+    public void testAlterInvalidNewTargetThrowsRuntimeError() {
+        RuntimeException exception = assertThrows(RuntimeException.class, () ->
+                runProgram("alter_invalid_new_target.babycob")
+        );
+
+        assertTrue(exception.getMessage().contains("ALTER"),
+                "Invalid ALTER target error should mention ALTER, got: " + exception.getMessage());
+        assertTrue(exception.getMessage().contains("MISSING-TARGET"),
+                "Invalid ALTER target error should mention missing target, got: " + exception.getMessage());
+    }
+
+    @Test
+    public void testAlteredComputableGoToBecomesNormalGoTo() throws Exception {
+        runProgram("alter_computable_becomes_normal.babycob");
+
+        String stdout = outContent.toString();
+
+        assertTrue(stdout.contains("ALTERED NORMAL TARGET"));
+        assertFalse(stdout.contains("COMPUTED FIELD TARGET"));
+        assertFalse(stdout.contains("ORIGINAL COMPUTED TARGET"));
+    }
 }
