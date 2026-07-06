@@ -60,7 +60,12 @@ usingProcedureClause
     ;
 
 paragraph
-    : ID DOT sentence*
+    : paragraphName DOT sentence*
+    ;
+
+paragraphName
+    : ID
+    | OFF
     ;
 
 sentence
@@ -83,6 +88,7 @@ statement
     | nextSentenceStmt
     | goToStmt
     | alterStmt
+    | signalStmt
     | callStmt
     ;
 
@@ -296,6 +302,10 @@ goToStmt
 
 alterStmt
     : ALTER ID TO PROCEED TO ID
+    ;
+
+signalStmt
+    : SIGNAL (ID | OFF) ON ERROR
     ;
 
 callStmt

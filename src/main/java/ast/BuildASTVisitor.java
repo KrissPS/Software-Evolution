@@ -268,16 +268,24 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
         if (ctx.usingProcedureClause() != null) {
             node.addChild(visit(ctx.usingProcedureClause()));
         }
+
+        boolean hasSignalOff = ctx.sentence().stream()
+                .flatMap(sentence -> sentence.statement().stream())
+                .anyMatch(statement -> statement.signalStmt() != null && statement.signalStmt().OFF() != null);
+
         for (BabyCobolParser.SentenceContext sentence : ctx.sentence()) {
             node.addChild(visit(sentence));
         }
         // traverse and add paragraphs to the AST
         Set<String> paragraphNames = new HashSet<>();
         for (BabyCobolParser.ParagraphContext paragraph : ctx.paragraph()) {
-            String paragraphName = paragraph.ID().getText();
+            String paragraphName = paragraph.paragraphName().getText();
             String normalizedName = paragraphName.toLowerCase(Locale.ROOT);
             if (!paragraphNames.add(normalizedName)) {
                 throw new IllegalArgumentException("Duplicate paragraph name: " + paragraphName);
+            }
+            if (hasSignalOff && normalizedName.equals("off")) {
+                throw new IllegalArgumentException("SIGNAL OFF ON ERROR is ambiguous when paragraph OFF exists");
             }
             node.addChild(visit(paragraph));
         }
@@ -299,7 +307,7 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
     @Override
     public ASTNode visitParagraph(BabyCobolParser.ParagraphContext ctx) {
         // store the paragraph name as node's text
-        ASTNode node = new ASTNode("Paragraph", ctx.ID().getText());
+        ASTNode node = new ASTNode("Paragraph", ctx.paragraphName().getText());
         for (BabyCobolParser.SentenceContext sentence : ctx.sentence()) {
             node.addChild(visit(sentence));
         }
@@ -647,6 +655,14 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
         ASTNode node = new ASTNode("AlterStmt", ctx.ID(0).getText());
         node.addChild(new ASTNode("AlterTarget", ctx.ID(1).getText()));
         return node;
+    }
+
+    @Override
+    public ASTNode visitSignalStmt(BabyCobolParser.SignalStmtContext ctx) {
+        if (ctx.OFF() != null) {
+            return new ASTNode("SignalOffStmt");
+        }
+        return new ASTNode("SignalStmt", ctx.ID().getText());
     }
 
     @Override
