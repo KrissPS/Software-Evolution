@@ -58,6 +58,24 @@ public class CopyPreprocessorTest {
     }
 
     @Test
+    void expandsCopyBookBeforeParsingProcedureDivision() throws Exception {
+        String code = """
+                IDENTIFICATION DIVISION.
+                PROGRAM-ID. COPYTEST.
+
+                PROCEDURE DIVISION.
+                COPY DISPLAY-LINE.
+                STOP.
+                """;
+
+        String processed = BabyCobolParserUtils.preprocess(code);
+
+        assertTrue(processed.contains("DISPLAY \"FROM COPY\""),
+                "COPY in PROCEDURE DIVISION should inline executable statements, got:\n" + processed);
+        assertDoesNotThrow(() -> ASTUtils.buildASTAndSymbolTable(processed));
+    }
+
+    @Test
     void copyDirectiveKeywordsAreCaseInsensitive() throws Exception {
         String code = """
                 IDENTIFICATION DIVISION.
