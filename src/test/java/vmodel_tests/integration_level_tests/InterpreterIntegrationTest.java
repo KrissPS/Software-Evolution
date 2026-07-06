@@ -97,6 +97,57 @@ public class InterpreterIntegrationTest {
     }
 
     @Test
+    public void testRecordMoveSourceToSmallerTargetCopiesOnlyMatchingChildren() throws Exception {
+        BabyCobolInterpreter interpreter = runProgram("record_move_source_to_smaller_target.babycob");
+
+        Map<String, Object> memory = interpreter.getMemory();
+        assertEquals(111.0, (Double) memory.get("d of c"));
+        assertEquals(111.0, (Double) memory.get("d of e"));
+        assertEquals(333.0, (Double) memory.get("f of e"));
+    }
+
+    @Test
+    public void testRecordMoveSourceToLargerTargetLeavesNonMatchingChildrenUntouched() throws Exception {
+        BabyCobolInterpreter interpreter = runProgram("record_move_source_to_larger_target.babycob");
+
+        Map<String, Object> memory = interpreter.getMemory();
+        assertEquals(444.0, (Double) memory.get("d of c"));
+        assertEquals(444.0, (Double) memory.get("d of e"));
+        assertEquals(333.0, (Double) memory.get("f of e"));
+    }
+
+    @Test
+    public void testRecordMoveWithoutMatchingChildNamesDoesNoAssignment() throws Exception {
+        BabyCobolInterpreter interpreter = runProgram("record_move_no_matching_children.babycob");
+
+        Map<String, Object> memory = interpreter.getMemory();
+        assertEquals(123.0, (Double) memory.get("d"));
+        assertEquals(456.0, (Double) memory.get("f"));
+    }
+
+    @Test
+    public void testNestedRecordMoveCopiesMatchingNestedChildren() throws Exception {
+        BabyCobolInterpreter interpreter = runProgram("record_move_nested_matching_children.babycob");
+
+        Map<String, Object> memory = interpreter.getMemory();
+        assertEquals(777.0, (Double) memory.get("d of child of target-rec"));
+        assertEquals(777.0, (Double) memory.get("d of child of source-rec"));
+        assertEquals(888.0, (Double) memory.get("f of child of target-rec"));
+    }
+
+    @Test
+    public void testRecordMoveWithDuplicateChildrenFailsClearly() {
+        RuntimeException exception = assertThrows(RuntimeException.class, () ->
+                runProgram("record_move_duplicate_children.babycob")
+        );
+
+        assertTrue(exception.getMessage().toLowerCase().contains("ambiguous"),
+                "Duplicate child error should mention ambiguity, got: " + exception.getMessage());
+        assertTrue(exception.getMessage().contains("MOVE"),
+                "Duplicate child error should mention MOVE, got: " + exception.getMessage());
+    }
+
+    @Test
     public void testDisplayAndAcceptStatements() throws Exception {
         setMockInput("456", "world");
         BabyCobolInterpreter interpreter = runProgram("display_and_accept.babycob");
