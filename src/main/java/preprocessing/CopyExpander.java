@@ -3,8 +3,16 @@ package preprocessing;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class CopyExpander {
+
+    private static final Pattern COPY_PATTERN = Pattern.compile(
+            "^COPY\\s+([^\\s.]+)(?:\\s+REPLACING\\s+===(.*?)===\\s+BY\\s+===(.*?)===)?\\s*\\.?$",
+            Pattern.CASE_INSENSITIVE
+    );
 
     private final Path copybookDirectory;
 
@@ -18,7 +26,7 @@ public class CopyExpander {
         for (String line : source.lines().toList()) {
             String trimmed = line.trim();
 
-            if (!trimmed.startsWith("COPY ")) {
+            if (!startsWithCopyKeyword(trimmed)) {
                 result.append(line).append(System.lineSeparator());
                 continue;
             }
@@ -31,36 +39,40 @@ public class CopyExpander {
     }
 
     private String expandCopyLine(String line) throws IOException {
-        String withoutDot = line.endsWith(".")
-                ? line.substring(0, line.length() - 1)
-                : line;
+        Matcher matcher = COPY_PATTERN.matcher(line);
+        if (!matcher.matches()) {
+            throw new IllegalArgumentException("Invalid COPY statement or REPLACING clause: " + line);
+        }
 
-        String[] parts = withoutDot.split("\\s+");
-
-        String fileName = parts[1];
-        Path copybook = copybookDirectory.resolve(fileName + ".babycob");
-
+        String fileName = matcher.group(1);
+        Path copybook = resolveCopybook(fileName);
         String content = Files.readString(copybook);
 
-        if (withoutDot.contains("REPLACING")) {
-            String oldText = extractBetween(line, "===", "===");
-            String remaining = line.substring(line.indexOf("BY") + 2);
-            String newText = extractBetween(remaining, "===", "===");
-
+        String oldText = matcher.group(2);
+        String newText = matcher.group(3);
+        if (oldText != null) {
             content = content.replace(oldText, newText);
         }
 
         return content;
     }
 
-    private String extractBetween(String text, String start, String end) {
-        int startIndex = text.indexOf(start);
-        int endIndex = text.indexOf(end, startIndex + start.length());
-
-        if (startIndex < 0 || endIndex < 0) {
-            throw new IllegalArgumentException("Invalid COPY literal: " + text);
+    private Path resolveCopybook(String fileName) {
+        Path exact = copybookDirectory.resolve(fileName + ".babycob");
+        if (Files.exists(exact)) {
+            return exact;
         }
 
-        return text.substring(startIndex + start.length(), endIndex);
+        Path lowercase = copybookDirectory.resolve(fileName.toLowerCase(Locale.ROOT) + ".babycob");
+        if (Files.exists(lowercase)) {
+            return lowercase;
+        }
+
+        throw new IllegalArgumentException("COPY copybook not found: " + fileName);
+    }
+
+    private boolean startsWithCopyKeyword(String text) {
+        return text.regionMatches(true, 0, "COPY", 0, "COPY".length())
+                && (text.length() == "COPY".length() || Character.isWhitespace(text.charAt("COPY".length())));
     }
 }
