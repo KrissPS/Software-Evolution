@@ -314,4 +314,30 @@ public class InterpreterIntegrationTest {
         assertTrue(stdout.contains("OUTSIDE TARGET"));
         assertTrue(stdout.indexOf("FIRST BEFORE GOTO") < stdout.indexOf("OUTSIDE TARGET"));
     }
+
+    @Test
+    public void testGoToInsidePerformThroughContinuesAtTargetInsideRange() throws Exception {
+        runProgram("goto_inside_perform_through_range.babycob");
+
+        String stdout = outContent.toString();
+
+        assertTrue(stdout.contains("MAIN BEFORE PERFORM"));
+        assertTrue(stdout.contains("FIRST BEFORE GOTO"));
+        assertFalse(stdout.contains("SECOND SHOULD NOT RUN"));
+        assertTrue(stdout.contains("THIRD TARGET"));
+        assertTrue(stdout.contains("MAIN AFTER PERFORM"));
+        assertTrue(stdout.indexOf("FIRST BEFORE GOTO") < stdout.indexOf("THIRD TARGET"));
+        assertTrue(stdout.indexOf("THIRD TARGET") < stdout.indexOf("MAIN AFTER PERFORM"));
+    }
+
+    @Test
+    public void testGoToCanJumpBackward() throws Exception {
+        runProgram("goto_backward.babycob");
+
+        String stdout = outContent.toString();
+
+        assertTrue(stdout.contains("SECOND FIRST"));
+        assertTrue(stdout.contains("FIRST AFTER BACKWARD"));
+        assertTrue(stdout.indexOf("SECOND FIRST") < stdout.indexOf("FIRST AFTER BACKWARD"));
+    }
 }

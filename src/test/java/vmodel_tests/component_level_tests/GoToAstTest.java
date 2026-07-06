@@ -4,6 +4,7 @@ import ast.ASTUtils;
 import org.junit.jupiter.api.Test;
 import preprocessing.BabyCobolParserUtils;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class GoToAstTest {
@@ -52,5 +53,29 @@ public class GoToAstTest {
                 "Loop should be preserved in AST, got:\n" + ast);
         assertTrue(ast.contains("GoToStmt: DONE"),
                 "GO TO inside loop should be preserved in AST, got:\n" + ast);
+    }
+
+    @Test
+    void duplicateParagraphNamesShouldFail() {
+        String code = """
+                IDENTIFICATION DIVISION.
+                PROGRAM-ID. MAIN.
+
+                PROCEDURE DIVISION.
+                FIRST.
+                DISPLAY "ONE".
+
+                FIRST.
+                DISPLAY "TWO".
+                """;
+
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                ASTUtils.buildASTAndSymbolTable(BabyCobolParserUtils.preprocess(code))
+        );
+
+        assertTrue(exception.getMessage().contains("Duplicate paragraph"),
+                "Duplicate paragraph error should explain the problem, got: " + exception.getMessage());
+        assertTrue(exception.getMessage().contains("FIRST"),
+                "Duplicate paragraph error should mention the duplicate name, got: " + exception.getMessage());
     }
 }
