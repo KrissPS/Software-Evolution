@@ -781,6 +781,8 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
             return new ASTNode("AtomicDecimal", ctx.DECIMAL().getText());
         } else if (ctx.STRING() != null) {
             return new ASTNode("AtomicString", ctx.STRING().getText());
+        } else if (ctx.figurativeConstant() != null) {
+            return new ASTNode("AtomicFigurative", ctx.figurativeConstant().getText());
         }
         return new ASTNode("Atomic");
     }
