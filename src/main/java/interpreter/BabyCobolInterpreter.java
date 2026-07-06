@@ -24,6 +24,7 @@ public class BabyCobolInterpreter {
     private java.util.List<String> paragraphNames;
     private Map<String, String> alteredGoToTargets;
     private String currentParagraphName;
+    private String signalHandlerParagraph;
 
     public Map<String, Object> getMemory() {
         return memory;
@@ -37,6 +38,7 @@ public class BabyCobolInterpreter {
         this.paragraphNames = new java.util.ArrayList<>();
         this.alteredGoToTargets = new HashMap<>();
         this.currentParagraphName = null;
+        this.signalHandlerParagraph = null;
 
         initializeMemory();
     }
@@ -176,6 +178,7 @@ public class BabyCobolInterpreter {
         paragraphNames.clear();
         alteredGoToTargets.clear();
         currentParagraphName = null;
+        signalHandlerParagraph = null;
         for (ASTNode child : procedureNode.getChildren()) {
             if (child.getType().equals("Paragraph")) {
                 String paraName = child.getText().toLowerCase(Locale.ROOT);
@@ -190,7 +193,7 @@ public class BabyCobolInterpreter {
             if (child.getType().equals("Sentence")) {
                 try {
                     for (ASTNode statement : child.getChildren()) {
-                        executeStatement(statement);
+                        executeStatementWithSignal(statement);
                     }
                 } catch (NextSentenceException e) {
                     // NEXT SENTENCE skips to the next sentence
@@ -217,7 +220,7 @@ public class BabyCobolInterpreter {
                 if (sentence.getType().equals("Sentence")) {
                     try {
                         for (ASTNode statement : sentence.getChildren()) {
-                            executeStatement(statement);
+                            executeStatementWithSignal(statement);
                         }
                     } catch (NextSentenceException e) {
                         // NEXT SENTENCE skips to the next sentence
@@ -227,6 +230,34 @@ public class BabyCobolInterpreter {
         } finally {
             currentParagraphName = previousParagraph;
         }
+    }
+
+    private void executeStatementWithSignal(ASTNode statement) {
+        try {
+            executeStatement(statement);
+        } catch (RuntimeException e) {
+            if (isControlFlowException(e)) {
+                throw e;
+            }
+            handleFatalError(e);
+        }
+    }
+
+    private boolean isControlFlowException(RuntimeException e) {
+        return e instanceof GoToException
+                || e instanceof NextSentenceException
+                || e instanceof StopProgramException;
+    }
+
+    private void handleFatalError(RuntimeException e) {
+        if (signalHandlerParagraph != null && !isExecutingSignalHandler()) {
+            throw new GoToException(signalHandlerParagraph);
+        }
+        throw e;
+    }
+
+    private boolean isExecutingSignalHandler() {
+        return currentParagraphName != null && currentParagraphName.equals(signalHandlerParagraph);
     }
 
     private void executeStatement(ASTNode statement) {
@@ -277,6 +308,12 @@ public class BabyCobolInterpreter {
             case "AlterStmt":
                 executeAlter(statement);
                 break;
+            case "SignalStmt":
+                executeSignal(statement);
+                break;
+            case "SignalOffStmt":
+                signalHandlerParagraph = null;
+                break;
             default:
                 System.err.println("Unimplemented statement type: " + statement.getType());
         }
@@ -319,6 +356,15 @@ public class BabyCobolInterpreter {
         return sentence.getType().equals("Sentence")
                 && sentence.getChildren().size() == 1
                 && sentence.getChildren().get(0).getType().equals("GoToStmt");
+    }
+
+    private void executeSignal(ASTNode node) {
+        String handlerName = node.getText();
+        String handlerKey = handlerName.toLowerCase(Locale.ROOT);
+        if (!paragraphs.containsKey(handlerKey)) {
+            throw new RuntimeException("SIGNAL handler paragraph does not exist: " + handlerName);
+        }
+        signalHandlerParagraph = handlerKey;
     }
 
     private String resolveGoToTarget(String target) {
@@ -749,7 +795,7 @@ public class BabyCobolInterpreter {
             for (ASTNode child : node.getChildren()) {
                 if (child.getType().equals("Then")) {
                     for (ASTNode stmt : child.getChildren()) {
-                        executeStatement(stmt);
+                        executeStatementWithSignal(stmt);
                     }
                 }
             }
@@ -758,7 +804,7 @@ public class BabyCobolInterpreter {
             for (ASTNode child : node.getChildren()) {
                 if (child.getType().equals("ElseStmt")) {
                     for (ASTNode stmt : child.getChildren()) {
-                        executeStatement(stmt);
+                        executeStatementWithSignal(stmt);
                     }
                 }
             }
@@ -782,7 +828,12 @@ public class BabyCobolInterpreter {
                         case "+": result += val; break;
                         case "-": result -= val; break;
                         case "*": result *= val; break;
-                        case "/": result /= val; break;
+                        case "/":
+                            if (val == 0.0) {
+                                throw new RuntimeException("Division by zero");
+                            }
+                            result /= val;
+                            break;
                     }
                 }
             } else if (child.getType().equals("GivingClause")) {
@@ -862,7 +913,7 @@ public class BabyCobolInterpreter {
 
             // 3) execute loop stmts
             for (ASTNode stmt : statements) {
-                executeStatement(stmt);
+                executeStatementWithSignal(stmt);
             }
 
             // 4) increment the VARYING var
@@ -960,7 +1011,7 @@ public class BabyCobolInterpreter {
                 // 5) execute matching statements and break (first match wins)
                 if (isMatch) {
                     for (int j = 1; j < child.getChildren().size(); j++) {
-                        executeStatement(child.getChildren().get(j));
+                        executeStatementWithSignal(child.getChildren().get(j));
                     }
                     break; 
                 }
