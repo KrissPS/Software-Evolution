@@ -22,6 +22,8 @@ public class BabyCobolInterpreter {
     // to store and order paragraphs for PERFORM/THROUGH
     private Map<String, ASTNode> paragraphs;
     private java.util.List<String> paragraphNames;
+    private Map<String, String> alteredGoToTargets;
+    private String currentParagraphName;
 
     public Map<String, Object> getMemory() {
         return memory;
@@ -33,6 +35,8 @@ public class BabyCobolInterpreter {
 
         this.paragraphs = new java.util.LinkedHashMap<>(); // maintains insertion order
         this.paragraphNames = new java.util.ArrayList<>();
+        this.alteredGoToTargets = new HashMap<>();
+        this.currentParagraphName = null;
 
         initializeMemory();
     }
@@ -170,9 +174,11 @@ public class BabyCobolInterpreter {
         // 1) pre-pass: indexing all paragraphs so they can be found by PERFORM
         paragraphs.clear();
         paragraphNames.clear();
+        alteredGoToTargets.clear();
+        currentParagraphName = null;
         for (ASTNode child : procedureNode.getChildren()) {
             if (child.getType().equals("Paragraph")) {
-                String paraName = child.getText().toLowerCase();
+                String paraName = child.getText().toLowerCase(Locale.ROOT);
                 paragraphs.put(paraName, child);
                 paragraphNames.add(paraName);
             }
@@ -204,16 +210,22 @@ public class BabyCobolInterpreter {
     }
 
     private void executeParagraph(ASTNode paragraphNode) {
-        for (ASTNode sentence : paragraphNode.getChildren()) {
-            if (sentence.getType().equals("Sentence")) {
-                try {
-                    for (ASTNode statement : sentence.getChildren()) {
-                        executeStatement(statement);
+        String previousParagraph = currentParagraphName;
+        currentParagraphName = paragraphNode.getText().toLowerCase(Locale.ROOT);
+        try {
+            for (ASTNode sentence : paragraphNode.getChildren()) {
+                if (sentence.getType().equals("Sentence")) {
+                    try {
+                        for (ASTNode statement : sentence.getChildren()) {
+                            executeStatement(statement);
+                        }
+                    } catch (NextSentenceException e) {
+                        // NEXT SENTENCE skips to the next sentence
                     }
-                } catch (NextSentenceException e) {
-                    // NEXT SENTENCE skips to the next sentence
                 }
             }
+        } finally {
+            currentParagraphName = previousParagraph;
         }
     }
 
@@ -262,6 +274,9 @@ public class BabyCobolInterpreter {
             case "GoToStmt":
                 executeGoTo(statement);
                 break;
+            case "AlterStmt":
+                executeAlter(statement);
+                break;
             default:
                 System.err.println("Unimplemented statement type: " + statement.getType());
         }
@@ -270,7 +285,40 @@ public class BabyCobolInterpreter {
     // --- statement implementations ---
 
     private void executeGoTo(ASTNode node) {
+        if (currentParagraphName != null && alteredGoToTargets.containsKey(currentParagraphName)) {
+            throw new GoToException(alteredGoToTargets.get(currentParagraphName));
+        }
         throw new GoToException(resolveGoToTarget(node.getText()));
+    }
+
+    private void executeAlter(ASTNode node) {
+        String alteredParagraphName = node.getText();
+        String alteredKey = alteredParagraphName.toLowerCase(Locale.ROOT);
+        String newTargetName = node.getChildren().get(0).getText();
+        String newTargetKey = newTargetName.toLowerCase(Locale.ROOT);
+
+        if (!paragraphs.containsKey(alteredKey)) {
+            throw new RuntimeException("ALTER target paragraph does not exist: " + alteredParagraphName);
+        }
+        if (!paragraphs.containsKey(newTargetKey)) {
+            throw new RuntimeException("ALTER new target paragraph does not exist: " + newTargetName);
+        }
+        if (!isAlterableGoToParagraph(paragraphs.get(alteredKey))) {
+            throw new RuntimeException("ALTER paragraph must contain exactly one sentence with exactly one GO TO statement: "
+                    + alteredParagraphName);
+        }
+
+        alteredGoToTargets.put(alteredKey, newTargetKey);
+    }
+
+    private boolean isAlterableGoToParagraph(ASTNode paragraphNode) {
+        if (paragraphNode.getChildren().size() != 1) {
+            return false;
+        }
+        ASTNode sentence = paragraphNode.getChildren().get(0);
+        return sentence.getType().equals("Sentence")
+                && sentence.getChildren().size() == 1
+                && sentence.getChildren().get(0).getType().equals("GoToStmt");
     }
 
     private String resolveGoToTarget(String target) {
