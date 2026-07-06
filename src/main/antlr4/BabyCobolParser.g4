@@ -263,6 +263,13 @@ atomic
     | INT
     | DECIMAL
     | STRING
+    | figurativeConstant
+    ;
+
+figurativeConstant
+    : SPACES
+    | HIGH_VALUES
+    | LOW_VALUES
     ;
 
 relationalOperator
