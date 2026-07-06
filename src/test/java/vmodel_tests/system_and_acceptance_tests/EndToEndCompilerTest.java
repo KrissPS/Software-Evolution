@@ -70,7 +70,7 @@ public class EndToEndCompilerTest {
         // Assert mathematical results
         assertTrue(stdout.contains("B AFTER ADD: 15.0"));
         assertTrue(stdout.contains("C AFTER MULTIPLY: 20.0"));
-        assertTrue(stdout.contains("A AFTER SUBTRACT: -1.0"));
+        assertTrue(stdout.contains("A AFTER SUBTRACT: 1.0"));
     }
 
 }

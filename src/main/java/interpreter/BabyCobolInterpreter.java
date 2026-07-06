@@ -812,34 +812,19 @@ public class BabyCobolInterpreter {
     }
 
     private void executeMath(ASTNode node, String op) {
-        double result = op.equals("*") || op.equals("/") ? 1.0 : 0.0;
         String targetId = null;
+        java.util.List<ASTNode> atomicNodes = new java.util.ArrayList<>();
 
         List<ASTNode> children = node.getChildren();
-        for (int i = 0; i < children.size(); i++) {
-            ASTNode child = children.get(i);
+        for (ASTNode child : children) {
             if (child.getType().startsWith("Atomic")) {
-                double val = Double.parseDouble(evaluateAtomic(child).toString());
-                
-                if (i == 0 && (op.equals("+") || op.equals("-"))) result = val;
-                else if (i == 0 && (op.equals("*") || op.equals("/"))) result = val;
-                else {
-                    switch (op) {
-                        case "+": result += val; break;
-                        case "-": result -= val; break;
-                        case "*": result *= val; break;
-                        case "/":
-                            if (val == 0.0) {
-                                throw new RuntimeException("Division by zero");
-                            }
-                            result /= val;
-                            break;
-                    }
-                }
-            } else if (child.getType().equals("GivingClause")) {
+                atomicNodes.add(child);
+            } else if (child.getType().equals("GivingClause") || child.getType().equals("GivingRemainderClause")) {
                 targetId = child.getChildren().get(0).getText().toLowerCase(); // first ID in giving
             }
         }
+
+        double result = evaluateMathStatementResult(atomicNodes, op);
 
         // if no giving clause assign to the last operand
         if (targetId != null) {
@@ -848,10 +833,49 @@ public class BabyCobolInterpreter {
              // fallback: assign to the last atomic ID found
              // (we are assuming it is in the same statement because we have filtered out for semantic/logical issues
              // when building ast)
-             ASTNode lastAtomic = children.get(children.size() - 1);
+             ASTNode lastAtomic = atomicNodes.get(atomicNodes.size() - 1);
              if (lastAtomic.getType().equals("AtomicID")) {
                  memory.put(lastAtomic.getText().toLowerCase(), result);
              }
+        }
+    }
+
+    private double evaluateMathStatementResult(List<ASTNode> atomicNodes, String op) {
+        if (atomicNodes.isEmpty()) {
+            return 0.0;
+        }
+
+        switch (op) {
+            case "+":
+                double sum = 0.0;
+                for (ASTNode atomic : atomicNodes) {
+                    sum += Double.parseDouble(evaluateAtomic(atomic).toString());
+                }
+                return sum;
+            case "*":
+                double product = 1.0;
+                for (ASTNode atomic : atomicNodes) {
+                    product *= Double.parseDouble(evaluateAtomic(atomic).toString());
+                }
+                return product;
+            case "-":
+                double subtraction = Double.parseDouble(evaluateAtomic(atomicNodes.get(atomicNodes.size() - 1)).toString());
+                for (int i = 0; i < atomicNodes.size() - 1; i++) {
+                    subtraction -= Double.parseDouble(evaluateAtomic(atomicNodes.get(i)).toString());
+                }
+                return subtraction;
+            case "/":
+                if (atomicNodes.size() < 2) {
+                    return Double.parseDouble(evaluateAtomic(atomicNodes.get(0)).toString());
+                }
+                double divisor = Double.parseDouble(evaluateAtomic(atomicNodes.get(0)).toString());
+                if (divisor == 0.0) {
+                    throw new RuntimeException("Division by zero");
+                }
+                double dividend = Double.parseDouble(evaluateAtomic(atomicNodes.get(atomicNodes.size() - 1)).toString());
+                return dividend / divisor;
+            default:
+                throw new RuntimeException("Unknown arithmetic operator: " + op);
         }
     }
 

@@ -167,8 +167,8 @@ public class InterpreterIntegrationTest {
         Map<String, Object> memory = runProgram("math_operations.babycob").getMemory();
         assertEquals(10.0, (Double) memory.get("a"));
         assertEquals(30.0, (Double) memory.get("b"));
-        assertEquals(-25.0, (Double) memory.get("d"));
-        assertEquals(2.0 / 30.0, (Double) memory.get("c"), 0.0001);
+        assertEquals(25.0, (Double) memory.get("d"));
+        assertEquals(15.0, (Double) memory.get("c"), 0.0001);
     }
 
     @Test
@@ -186,7 +186,7 @@ public class InterpreterIntegrationTest {
         Map<String, Object> memory = runProgram("conditional_and_loop.babycob").getMemory();
         assertEquals(12.0, (Double) memory.get("x"));
         assertEquals(22.0, (Double) memory.get("y"));
-        assertEquals(0.0, (Double) memory.get("counter"));
+        assertEquals(5.0, (Double) memory.get("counter"));
     }
 ////////////
     @Test
