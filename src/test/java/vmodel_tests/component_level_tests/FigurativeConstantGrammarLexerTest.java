@@ -11,6 +11,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class FigurativeConstantGrammarLexerTest {
 
@@ -57,6 +58,22 @@ public class FigurativeConstantGrammarLexerTest {
                 """;
 
         assertDoesNotThrow(() -> BabyCobolParserUtils.parseTree(code));
+    }
+
+    @Test
+    void rejectsFigurativeConstantsAsArithmeticArguments() {
+        String code = """
+                IDENTIFICATION DIVISION.
+                PROGRAM-ID. MAIN.
+
+                DATA DIVISION.
+                01 TARGET-FIELD PICTURE IS 9(3).
+
+                PROCEDURE DIVISION.
+                ADD SPACES TO TARGET-FIELD.
+                """;
+
+        assertThrows(RuntimeException.class, () -> BabyCobolParserUtils.parseTree(code));
     }
 
     private List<String> tokenNamesFor(String source) {

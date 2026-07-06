@@ -334,13 +334,17 @@ public class BabyCobolInterpreter {
     }
 
     private void executeMove(ASTNode node) {
-        Object value = evaluateAtomic(node.getChildren().get(0));
+        ASTNode sourceNode = node.getChildren().get(0);
+        boolean figurativeMove = sourceNode.getType().equals("AtomicFigurative");
         
         // looping through all target IDs
         for (int i = 1; i < node.getChildren().size(); i++) {
             ASTNode target = node.getChildren().get(i);
             if (target.getType().equals("ToID")) {
                 String varName = target.getText().toLowerCase();
+                Object value = figurativeMove
+                        ? evaluateFigurativeConstantForTarget(sourceNode.getText(), varName)
+                        : evaluateAtomic(sourceNode);
 
                 // if the target is an OCCURS array, assign value to all elements
                 if (memory.containsKey(varName) && memory.get(varName) instanceof Object[]) {
@@ -365,6 +369,156 @@ public class BabyCobolInterpreter {
                 }
             }
         }
+    }
+
+    private Object evaluateFigurativeConstantForTarget(String constant, String targetName) {
+        Symbol targetSymbol = symbolTable.getSymbol(targetName);
+        if (targetSymbol == null || targetSymbol.getPicture() == null || targetSymbol.getPicture().isEmpty()) {
+            throw new RuntimeException("Cannot MOVE " + constant + " to non-elementary target: " + targetName);
+        }
+
+        String picture = targetSymbol.getPicture();
+        if (isRuntimeNumericPicture(picture)) {
+            return numericFigurativeValue(constant, picture);
+        }
+        return stringFigurativeValue(constant, picture);
+    }
+
+    private boolean isRuntimeNumericPicture(String picture) {
+        return picture != null && picture.toUpperCase(Locale.ROOT).contains("9");
+    }
+
+    private Object numericFigurativeValue(String constant, String picture) {
+        switch (constant.toUpperCase(Locale.ROOT)) {
+            case "HIGH-VALUES":
+                return highestNumericValue(picture);
+            case "SPACES":
+            case "LOW-VALUES":
+                return 0.0;
+            default:
+                throw new RuntimeException("Unknown figurative constant: " + constant);
+        }
+    }
+
+    private double highestNumericValue(String picture) {
+        StringBuilder numeric = new StringBuilder();
+        for (char ch : expandPicture(picture).toCharArray()) {
+            switch (Character.toUpperCase(ch)) {
+                case '9':
+                case 'Z':
+                    numeric.append('9');
+                    break;
+                case 'V':
+                    numeric.append('.');
+                    break;
+                case 'S':
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        String number = numeric.toString();
+        if (number.isEmpty() || number.equals(".")) {
+            return 0.0;
+        }
+        return Double.parseDouble(number);
+    }
+
+    private String stringFigurativeValue(String constant, String picture) {
+        StringBuilder value = new StringBuilder();
+        for (char ch : expandPicture(picture).toCharArray()) {
+            char normalized = Character.toUpperCase(ch);
+            switch (constant.toUpperCase(Locale.ROOT)) {
+                case "SPACES":
+                    value.append(spaceValueForPictureSymbol(normalized));
+                    break;
+                case "HIGH-VALUES":
+                    value.append(highValueForPictureSymbol(normalized));
+                    break;
+                case "LOW-VALUES":
+                    value.append(lowValueForPictureSymbol(normalized));
+                    break;
+                default:
+                    throw new RuntimeException("Unknown figurative constant: " + constant);
+            }
+        }
+        return value.toString();
+    }
+
+    private char spaceValueForPictureSymbol(char symbol) {
+        switch (symbol) {
+            case '9':
+                return '0';
+            case 'V':
+                return '.';
+            default:
+                return ' ';
+        }
+    }
+
+    private char highValueForPictureSymbol(char symbol) {
+        switch (symbol) {
+            case '9':
+            case 'Z':
+                return '9';
+            case 'A':
+                return 'z';
+            case 'X':
+                return '\u00ff';
+            case 'S':
+                return '+';
+            case 'V':
+                return '.';
+            default:
+                return '\u00ff';
+        }
+    }
+
+    private char lowValueForPictureSymbol(char symbol) {
+        switch (symbol) {
+            case '9':
+                return '0';
+            case 'X':
+                return '\u0000';
+            case 'S':
+                return '-';
+            case 'V':
+                return '.';
+            default:
+                return ' ';
+        }
+    }
+
+    private String expandPicture(String picture) {
+        StringBuilder expanded = new StringBuilder();
+        String normalized = picture.toUpperCase(Locale.ROOT);
+
+        for (int i = 0; i < normalized.length(); i++) {
+            char ch = normalized.charAt(i);
+            if (!isPictureSymbol(ch)) {
+                continue;
+            }
+
+            int repeat = 1;
+            if (i + 1 < normalized.length() && normalized.charAt(i + 1) == '(') {
+                int close = normalized.indexOf(')', i + 2);
+                if (close > i + 2) {
+                    repeat = Integer.parseInt(normalized.substring(i + 2, close));
+                    i = close;
+                }
+            }
+
+            for (int j = 0; j < repeat; j++) {
+                expanded.append(ch);
+            }
+        }
+
+        return expanded.toString();
+    }
+
+    private boolean isPictureSymbol(char ch) {
+        return ch == '9' || ch == 'A' || ch == 'X' || ch == 'Z' || ch == 'S' || ch == 'V';
     }
 
     /**

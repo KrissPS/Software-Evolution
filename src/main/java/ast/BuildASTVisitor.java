@@ -437,13 +437,18 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
     @Override
     public ASTNode visitMoveStmt(BabyCobolParser.MoveStmtContext ctx) {
         ASTNode node = new ASTNode("MoveStmt");
-        node.addChild(visit(ctx.atomic()));
+        node.addChild(visit(ctx.moveSource()));
         for (BabyCobolParser.QualifiedNameContext qn : ctx.qualifiedName()) {
             String qnText = qualifiedNameText(qn);
             String resolvedName = resolveAndGetSimpleName(qnText, "MOVE statement");
             node.addChild(new ASTNode("ToID", resolvedName));
         }
         return node;
+    }
+
+    @Override
+    public ASTNode visitMoveSource(BabyCobolParser.MoveSourceContext ctx) {
+        return visit(ctx.getChild(0));
     }
 
     @Override
@@ -781,10 +786,13 @@ public class BuildASTVisitor extends BabyCobolParserBaseVisitor<ASTNode> {
             return new ASTNode("AtomicDecimal", ctx.DECIMAL().getText());
         } else if (ctx.STRING() != null) {
             return new ASTNode("AtomicString", ctx.STRING().getText());
-        } else if (ctx.figurativeConstant() != null) {
-            return new ASTNode("AtomicFigurative", ctx.figurativeConstant().getText());
         }
         return new ASTNode("Atomic");
+    }
+
+    @Override
+    public ASTNode visitFigurativeConstant(BabyCobolParser.FigurativeConstantContext ctx) {
+        return new ASTNode("AtomicFigurative", ctx.getText());
     }
 
     @Override

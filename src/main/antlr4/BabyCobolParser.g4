@@ -118,7 +118,12 @@ elseStmt
 
 // MOVE statement ----
 moveStmt
-    : MOVE atomic TO qualifiedName+
+    : MOVE moveSource TO qualifiedName+
+    ;
+
+moveSource
+    : atomic
+    | figurativeConstant
     ;
 // MOVE statement END ----
 
@@ -263,7 +268,6 @@ atomic
     | INT
     | DECIMAL
     | STRING
-    | figurativeConstant
     ;
 
 figurativeConstant
