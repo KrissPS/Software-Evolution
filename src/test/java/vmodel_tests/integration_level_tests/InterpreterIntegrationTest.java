@@ -172,6 +172,16 @@ public class InterpreterIntegrationTest {
     }
 
     @Test
+    public void testSubtractAndDivideUseTargetOperandDirection() throws Exception {
+        Map<String, Object> memory = runProgram("directional_arithmetic.babycob").getMemory();
+
+        assertEquals(20.0, (Double) memory.get("c"));
+        assertEquals(3.0, (Double) memory.get("d"), 0.0001);
+        assertEquals(25.0, (Double) memory.get("e"));
+        assertEquals(5.0, (Double) memory.get("f"), 0.0001);
+    }
+
+    @Test
     public void testConditionalAndLoop() throws Exception {
         Map<String, Object> memory = runProgram("conditional_and_loop.babycob").getMemory();
         assertEquals(12.0, (Double) memory.get("x"));
